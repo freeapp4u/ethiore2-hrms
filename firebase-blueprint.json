@@ -1,0 +1,191 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "An administrative operator or HR Officer of the HRMS system.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "fullName": { "type": "string", "maxLength": 256 },
+        "email": { "type": "string", "maxLength": 256, "pattern": "^[^@]+@[^@]+\\.[^@]+$" },
+        "role": { "type": "string", "enum": ["Administrator", "HR Officer"] },
+        "status": { "type": "string", "enum": ["Active", "Inactive", "Suspended"] },
+        "createdDate": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "fullName", "email", "role", "status", "createdDate"]
+    },
+    "Department": {
+      "title": "Department",
+      "description": "An organizational unit within Ethiopian Reinsurance.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "code": { "type": "string", "maxLength": 32 },
+        "description": { "type": "string", "maxLength": 512 },
+        "status": { "type": "string", "enum": ["Active", "Inactive"] },
+        "createdDate": { "type": "string", "maxLength": 64 },
+        "updatedDate": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "name", "code", "description", "status", "createdDate", "updatedDate"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "An employee record of Ethiopian Reinsurance.",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string", "maxLength": 128 },
+        "firstName": { "type": "string", "maxLength": 128 },
+        "middleName": { "type": "string", "maxLength": 128 },
+        "lastName": { "type": "string", "maxLength": 128 },
+        "fullName": { "type": "string", "maxLength": 384 },
+        "gender": { "type": "string", "enum": ["Male", "Female"] },
+        "dob": { "type": "string", "maxLength": 16 },
+        "email": { "type": "string", "maxLength": 256, "pattern": "^[^@]+@[^@]+\\.[^@]+$" },
+        "phoneNumber": { "type": "string", "maxLength": 32 },
+        "address": { "type": "string", "maxLength": 512 },
+        "departmentId": { "type": "string", "maxLength": 128 },
+        "position": { "type": "string", "maxLength": 128 },
+        "employmentType": { "type": "string", "enum": ["Permanent", "Contract", "Temporary", "Intern"] },
+        "hireDate": { "type": "string", "maxLength": 16 },
+        "status": { "type": "string", "enum": ["Active", "Inactive"] },
+        "createdDate": { "type": "string", "maxLength": 64 },
+        "createdBy": { "type": "string", "maxLength": 256 },
+        "updatedDate": { "type": "string", "maxLength": 64 },
+        "updatedBy": { "type": "string", "maxLength": 256 }
+      },
+      "required": [
+        "employeeId",
+        "firstName",
+        "middleName",
+        "lastName",
+        "fullName",
+        "gender",
+        "dob",
+        "email",
+        "phoneNumber",
+        "address",
+        "departmentId",
+        "position",
+        "employmentType",
+        "hireDate",
+        "status",
+        "createdDate",
+        "createdBy",
+        "updatedDate",
+        "updatedBy"
+      ]
+    },
+    "AttendanceRecord": {
+      "title": "AttendanceRecord",
+      "description": "A daily check-in/check-out timestamp log.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "employeeId": { "type": "string", "maxLength": 128 },
+        "date": { "type": "string", "maxLength": 16 },
+        "checkInTime": { "type": "string", "maxLength": 16 },
+        "checkOutTime": { "type": "string", "maxLength": 16 },
+        "status": { "type": "string", "enum": ["Present", "Absent", "Late", "On Leave", "Half Day", "Other"] },
+        "workingHours": { "type": "number" },
+        "lateStatus": { "type": "string", "enum": ["Yes", "No"] },
+        "remarks": { "type": "string", "maxLength": 512 },
+        "recordedBy": { "type": "string", "maxLength": 256 },
+        "createdDate": { "type": "string", "maxLength": 64 },
+        "updatedDate": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "employeeId", "date", "checkInTime", "checkOutTime", "status", "workingHours", "lateStatus", "remarks", "recordedBy", "createdDate", "updatedDate"]
+    },
+    "LeaveRecord": {
+      "title": "LeaveRecord",
+      "description": "An employee leave booking ledger entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "employeeId": { "type": "string", "maxLength": 128 },
+        "leaveType": { "type": "string", "maxLength": 128 },
+        "startDate": { "type": "string", "maxLength": 16 },
+        "endDate": { "type": "string", "maxLength": 16 },
+        "daysCount": { "type": "number" },
+        "reason": { "type": "string", "maxLength": 512 },
+        "status": { "type": "string", "enum": ["Active", "Completed", "Cancelled"] },
+        "remarks": { "type": "string", "maxLength": 512 },
+        "recordedBy": { "type": "string", "maxLength": 256 },
+        "createdDate": { "type": "string", "maxLength": 64 },
+        "updatedDate": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "employeeId", "leaveType", "startDate", "endDate", "daysCount", "reason", "status", "remarks", "recordedBy", "createdDate", "updatedDate"]
+    },
+    "PublicHoliday": {
+      "title": "PublicHoliday",
+      "description": "A calendar date marked as a company public holiday.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 256 },
+        "date": { "type": "string", "maxLength": 16 }
+      },
+      "required": ["id", "name", "date"]
+    },
+    "CompanyConfig": {
+      "title": "CompanyConfig",
+      "description": "The branding, profile, and policy configurations of the company.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "An immutable security transaction and auditing log.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userEmail": { "type": "string", "maxLength": 256 },
+        "userRole": { "type": "string", "maxLength": 128 },
+        "module": { "type": "string", "maxLength": 128 },
+        "action": { "type": "string", "maxLength": 128 },
+        "recordEntity": { "type": "string", "maxLength": 256 },
+        "details": { "type": "string", "maxLength": 1024 }
+      },
+      "required": ["id", "timestamp", "userId", "userEmail", "userRole", "module", "action", "recordEntity", "details"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "Gated system operators"
+    },
+    "departments": {
+      "schema": "Department",
+      "description": "Organizational departments"
+    },
+    "employees": {
+      "schema": "Employee",
+      "description": "Employee database profiles"
+    },
+    "attendance": {
+      "schema": "AttendanceRecord",
+      "description": "Daily attendance checkpoints"
+    },
+    "leaves": {
+      "schema": "LeaveRecord",
+      "description": "Leave bookings"
+    },
+    "holidays": {
+      "schema": "PublicHoliday",
+      "description": "Public holidays calendar"
+    },
+    "config": {
+      "schema": "CompanyConfig",
+      "description": "Central company settings document"
+    },
+    "logs": {
+      "schema": "ActivityLog",
+      "description": "Immutable auditing logs"
+    }
+  }
+}

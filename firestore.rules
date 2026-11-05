@@ -1,0 +1,172 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global safety net - Default Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Common helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUserVerified() {
+      return isSignedIn(); // Support general authenticated operations
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Check if current user is an Administrator
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email in ["contactesfaye@gmail.com", "admin@ethio-re.com", "tesfayeteklufeyissa@gmail.com"] ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "Administrator")
+      );
+    }
+
+    // Check if current user is an HR Officer or Administrator
+    function isStaff() {
+      return isSignedIn() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "Administrator" || 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "HR Officer"))
+      );
+    }
+
+    // Entity Validations
+
+    // Users
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if (
+        isAdmin() || 
+        (isSignedIn() && (request.auth.uid == userId || incoming().email == request.auth.token.email))
+      ) && 
+        incoming().fullName is string && incoming().fullName.size() <= 256 &&
+        incoming().email is string && incoming().email.size() <= 256 &&
+        incoming().role in ["Administrator", "HR Officer"] &&
+        incoming().status in ["Active", "Inactive", "Suspended", "Pending Verification"];
+      
+      allow update: if (isAdmin() || (isSignedIn() && (request.auth.uid == userId || incoming().email == request.auth.token.email))) &&
+        incoming().fullName is string && incoming().fullName.size() <= 256 &&
+        incoming().role in ["Administrator", "HR Officer"] &&
+        incoming().status in ["Active", "Inactive", "Suspended", "Pending Verification"] &&
+        // Protect role escalations from normal users
+        (isAdmin() || incoming().role == existing().role);
+      
+      allow delete: if isAdmin();
+    }
+
+    // Departments
+    match /departments/{deptId} {
+      allow read: if isSignedIn();
+      allow create, update: if isStaff() &&
+        incoming().id == deptId &&
+        incoming().name is string && incoming().name.size() <= 128 &&
+        incoming().code is string && incoming().code.size() <= 32 &&
+        incoming().description is string && incoming().description.size() <= 512 &&
+        incoming().status in ["Active", "Inactive"];
+      allow delete: if isAdmin();
+    }
+
+    // Employees
+    match /employees/{employeeId} {
+      allow read: if isSignedIn();
+      allow create, update: if isStaff() &&
+        incoming().employeeId == employeeId &&
+        incoming().firstName is string && incoming().firstName.size() <= 128 &&
+        incoming().middleName is string && incoming().middleName.size() <= 128 &&
+        incoming().lastName is string && incoming().lastName.size() <= 128 &&
+        incoming().fullName is string && incoming().fullName.size() <= 384 &&
+        incoming().gender in ["Male", "Female"] &&
+        incoming().email is string && incoming().email.size() <= 256 &&
+        incoming().phoneNumber is string && incoming().phoneNumber.size() <= 32 &&
+        incoming().address is string && incoming().address.size() <= 512 &&
+        incoming().departmentId is string && incoming().departmentId.size() <= 128 &&
+        incoming().position is string && incoming().position.size() <= 128 &&
+        incoming().employmentType in ["Permanent", "Contract", "Temporary", "Intern"] &&
+        incoming().status in ["Active", "Inactive"];
+      allow delete: if isAdmin();
+    }
+
+    // Attendance
+    match /attendance/{attendanceId} {
+      allow read: if isSignedIn();
+      allow create, update: if isStaff() &&
+        incoming().id == attendanceId &&
+        incoming().employeeId is string && incoming().employeeId.size() <= 128 &&
+        incoming().date is string && incoming().date.size() <= 16 &&
+        incoming().checkInTime is string && incoming().checkInTime.size() <= 16 &&
+        incoming().checkOutTime is string && incoming().checkOutTime.size() <= 16 &&
+        incoming().status in ["Present", "Absent", "Late", "On Leave", "Half Day", "Other"] &&
+        incoming().workingHours is number &&
+        incoming().lateStatus in ["Yes", "No"] &&
+        incoming().remarks is string && incoming().remarks.size() <= 512 &&
+        incoming().recordedBy is string && incoming().recordedBy.size() <= 256;
+      allow delete: if isAdmin();
+    }
+
+    // Leaves
+    match /leaves/{leaveId} {
+      allow read: if isSignedIn();
+      allow create, update: if isStaff() &&
+        incoming().id == leaveId &&
+        incoming().employeeId is string && incoming().employeeId.size() <= 128 &&
+        incoming().leaveType is string && incoming().leaveType.size() <= 128 &&
+        incoming().startDate is string && incoming().startDate.size() <= 16 &&
+        incoming().endDate is string && incoming().endDate.size() <= 16 &&
+        incoming().daysCount is number &&
+        incoming().reason is string && incoming().reason.size() <= 512 &&
+        incoming().status in ["Active", "Completed", "Cancelled"] &&
+        incoming().remarks is string && incoming().remarks.size() <= 512 &&
+        incoming().recordedBy is string && incoming().recordedBy.size() <= 256;
+      allow delete: if isAdmin();
+    }
+
+    // Holidays
+    match /holidays/{holidayId} {
+      allow read: if isSignedIn();
+      allow create, update: if isStaff() &&
+        incoming().id == holidayId &&
+        incoming().name is string && incoming().name.size() <= 256 &&
+        incoming().date is string && incoming().date.size() <= 16;
+      allow delete: if isAdmin();
+    }
+
+    // Config
+    match /config/{configId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Logs (Audit log - read-only for admin, create-only for signed-in users)
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() &&
+        incoming().id == logId &&
+        incoming().timestamp is string && incoming().timestamp.size() <= 64 &&
+        incoming().userId is string && incoming().userId.size() <= 128 &&
+        incoming().userEmail is string && incoming().userEmail.size() <= 256 &&
+        incoming().userRole is string && incoming().userRole.size() <= 128 &&
+        incoming().module is string && incoming().module.size() <= 128 &&
+        incoming().action is string && incoming().action.size() <= 128 &&
+        incoming().recordEntity is string && incoming().recordEntity.size() <= 256 &&
+        incoming().details is string && incoming().details.size() <= 1024;
+      allow update, delete: if false;
+    }
+  }
+}

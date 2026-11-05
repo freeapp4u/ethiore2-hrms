@@ -1,0 +1,6 @@
+{
+  "name": "Ethio-Re HRMS",
+  "description": "Ethiopian Reinsurance S.C. Human Resource Management System for Attendance, Leave Management, and Company Settings.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
