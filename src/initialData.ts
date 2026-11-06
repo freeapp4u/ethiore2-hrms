@@ -1,4 +1,4 @@
-import { User, Department, Employee, AttendanceRecord, LeaveRecord, PublicHoliday, CompanyConfig, ActivityLog } from "./types";
+import { User, Department, Employee, AttendanceRecord, LeaveRecord, PublicHoliday, CompanyConfig, ActivityLog, FamilyMember, MedicalExpense } from "./types";
 
 export const DEFAULT_USERS: User[] = [
   {
@@ -75,92 +75,7 @@ export const DEFAULT_DEPARTMENTS: Department[] = [
   }
 ];
 
-export const DEFAULT_EMPLOYEES: Employee[] = [
-  {
-    employeeId: "EMP001",
-    firstName: "Yonas",
-    middleName: "Alula",
-    lastName: "Wolde",
-    fullName: "Yonas Alula Wolde",
-    gender: "Male",
-    dob: "1985-05-12",
-    email: "yonas.alula@ethiopianre.com",
-    phoneNumber: "+251-911-234567",
-    address: "Bole Medhanialem, House 410, Addis Ababa",
-    departmentId: "HRAD",
-    position: "HR Manager",
-    employmentType: "Permanent",
-    hireDate: "2026-01-15",
-    status: "Active",
-    createdDate: "2026-01-15",
-    createdBy: "admin@ethio-re.com",
-    updatedDate: "2026-01-15",
-    updatedBy: "admin@ethio-re.com"
-  },
-  {
-    employeeId: "EMP002",
-    firstName: "Selam",
-    middleName: "Tesfaye",
-    lastName: "Beyene",
-    fullName: "Selam Tesfaye Beyene",
-    gender: "Female",
-    dob: "1990-08-22",
-    email: "selam.tesfaye@ethiopianre.com",
-    phoneNumber: "+251-912-876543",
-    address: "Sarbet, Block 12, Addis Ababa",
-    departmentId: "REOP",
-    position: "Senior Underwriter",
-    employmentType: "Permanent",
-    hireDate: "2026-02-01",
-    status: "Active",
-    createdDate: "2026-02-01",
-    createdBy: "admin@ethio-re.com",
-    updatedDate: "2026-02-01",
-    updatedBy: "admin@ethio-re.com"
-  },
-  {
-    employeeId: "EMP003",
-    firstName: "Abel",
-    middleName: "Kebede",
-    lastName: "Tessema",
-    fullName: "Abel Kebede Tessema",
-    gender: "Male",
-    dob: "1993-01-15",
-    email: "abel.kebede@ethiopianre.com",
-    phoneNumber: "+251-920-112233",
-    address: "Gerji, House 1022, Addis Ababa",
-    departmentId: "INFOTECH",
-    position: "System Administrator",
-    employmentType: "Permanent",
-    hireDate: "2026-03-10",
-    status: "Active",
-    createdDate: "2026-03-10",
-    createdBy: "admin@ethio-re.com",
-    updatedDate: "2026-03-10",
-    updatedBy: "admin@ethio-re.com"
-  },
-  {
-    employeeId: "EMP004",
-    firstName: "Tigist",
-    middleName: "Haile",
-    lastName: "Mariam",
-    fullName: "Tigist Haile Mariam",
-    gender: "Female",
-    dob: "1988-11-30",
-    email: "tigist.haile@ethiopianre.com",
-    phoneNumber: "+251-911-556677",
-    address: "CMC, Villa 44, Addis Ababa",
-    departmentId: "FIAC",
-    position: "Chief Accountant",
-    employmentType: "Permanent",
-    hireDate: "2026-01-20",
-    status: "Active",
-    createdDate: "2026-01-20",
-    createdBy: "admin@ethio-re.com",
-    updatedDate: "2026-01-20",
-    updatedBy: "admin@ethio-re.com"
-  }
-];
+export const DEFAULT_EMPLOYEES: Employee[] = [];
 
 export const DEFAULT_HOLIDAYS: PublicHoliday[] = [
   { id: "H001", name: "Ethiopian New Year (Enkutatash)", date: "2026-09-11" },
@@ -172,125 +87,9 @@ export const DEFAULT_HOLIDAYS: PublicHoliday[] = [
   { id: "H007", name: "Ethiopian Easter (Fasika)", date: "2026-04-12" }
 ];
 
-export const DEFAULT_ATTENDANCE: AttendanceRecord[] = [
-  // Yesterday's Records (2026-09-03)
-  {
-    id: "ATT001",
-    employeeId: "EMP001",
-    date: "2026-09-03",
-    checkInTime: "08:12",
-    checkOutTime: "17:05",
-    status: "Present",
-    workingHours: 8.5,
-    lateStatus: "No",
-    remarks: "Regular working hours",
-    recordedBy: "hr@ethio-re.com",
-    createdDate: "2026-09-03 17:10:00",
-    updatedDate: "2026-09-03 17:10:00"
-  },
-  {
-    id: "ATT002",
-    employeeId: "EMP002",
-    date: "2026-09-03",
-    checkInTime: "",
-    checkOutTime: "",
-    status: "On Leave",
-    workingHours: 0,
-    lateStatus: "No",
-    remarks: "Approved annual leave segment",
-    recordedBy: "hr@ethio-re.com",
-    createdDate: "2026-09-03 09:15:00",
-    updatedDate: "2026-09-03 09:15:00"
-  },
-  {
-    id: "ATT003",
-    employeeId: "EMP003",
-    date: "2026-09-03",
-    checkInTime: "08:29",
-    checkOutTime: "17:15",
-    status: "Present",
-    workingHours: 8.7,
-    lateStatus: "No",
-    remarks: "Regular working hours",
-    recordedBy: "hr@ethio-re.com",
-    createdDate: "2026-09-03 17:20:00",
-    updatedDate: "2026-09-03 17:20:00"
-  },
-  {
-    id: "ATT004",
-    employeeId: "EMP004",
-    date: "2026-09-03",
-    checkInTime: "09:05",
-    checkOutTime: "17:00",
-    status: "Late",
-    workingHours: 7.9,
-    lateStatus: "Yes",
-    remarks: "Late entry due to heavy traffic around CMC road",
-    recordedBy: "hr@ethio-re.com",
-    createdDate: "2026-09-03 17:15:00",
-    updatedDate: "2026-09-03 17:15:00"
-  },
-  // Today's Records (2026-09-04)
-  {
-    id: "ATT005",
-    employeeId: "EMP001",
-    date: "2026-09-04",
-    checkInTime: "08:15",
-    checkOutTime: "",
-    status: "Present",
-    workingHours: 0,
-    lateStatus: "No",
-    remarks: "",
-    recordedBy: "hr@ethio-re.com",
-    createdDate: "2026-09-04 08:20:00",
-    updatedDate: "2026-09-04 08:20:00"
-  },
-  {
-    id: "ATT006",
-    employeeId: "EMP002",
-    date: "2026-09-04",
-    checkInTime: "",
-    checkOutTime: "",
-    status: "On Leave",
-    workingHours: 0,
-    lateStatus: "No",
-    remarks: "Annual Leave",
-    recordedBy: "hr@ethio-re.com",
-    createdDate: "2026-09-04 08:00:00",
-    updatedDate: "2026-09-04 08:00:00"
-  },
-  {
-    id: "ATT007",
-    employeeId: "EMP003",
-    date: "2026-09-04",
-    checkInTime: "08:20",
-    checkOutTime: "",
-    status: "Present",
-    workingHours: 0,
-    lateStatus: "No",
-    remarks: "",
-    recordedBy: "hr@ethio-re.com",
-    createdDate: "2026-09-04 08:25:00",
-    updatedDate: "2026-09-04 08:25:00"
-  }
-];
+export const DEFAULT_ATTENDANCE: AttendanceRecord[] = [];
 
-export const DEFAULT_LEAVES: LeaveRecord[] = [
-  {
-    id: "L001",
-    employeeId: "EMP002",
-    leaveType: "Annual Leave",
-    startDate: "2026-09-01",
-    endDate: "2026-09-04",
-    daysCount: 4,
-    reason: "Rest and recreation with family.",
-    status: "Active",
-    remarks: "Authorized full coverage",
-    recordedBy: "hr@ethio-re.com",
-    createdDate: "2026-08-25 10:00:00",
-    updatedDate: "2026-08-25 10:00:00"
-  }
-];
+export const DEFAULT_LEAVES: LeaveRecord[] = [];
 
 export const DEFAULT_COMPANY_CONFIG: CompanyConfig = {
   profile: {
@@ -316,33 +115,130 @@ export const DEFAULT_COMPANY_CONFIG: CompanyConfig = {
     "Sick Leave": 15,
     "Maternity Leave": 90,
     "Paternity Leave": 5,
-    "Bereavement Leave": 7,
-    "Study Leave": 45,
-    "Unpaid Leave": 30
+    "Compassionate Leave": 7,
+    "Unpaid Leave": 30,
+    "Other Leave": 10
+  },
+  leaveTypesConfig: [
+    {
+      id: "LT001",
+      name: "Annual Leave",
+      code: "AL",
+      description: "Paid statutory vacation leave for rest and recreation.",
+      annualEntitlement: 30,
+      isPaid: true,
+      accrualRule: "Annual",
+      carryForwardEligible: true,
+      maxCarryForwardDays: 10,
+      expirationPeriodMonths: 12,
+      requiresSupportingDocument: false,
+      status: "Active"
+    },
+    {
+      id: "LT002",
+      name: "Sick Leave",
+      code: "SL",
+      description: "Paid leave for medical recovery, treatment, or illness.",
+      annualEntitlement: 15,
+      isPaid: true,
+      accrualRule: "Immediate",
+      carryForwardEligible: false,
+      maxCarryForwardDays: 0,
+      expirationPeriodMonths: 12,
+      requiresSupportingDocument: true,
+      status: "Active"
+    },
+    {
+      id: "LT003",
+      name: "Maternity Leave",
+      code: "ML",
+      description: "Fully paid maternity leave for female employees upon childbirth.",
+      annualEntitlement: 90,
+      isPaid: true,
+      accrualRule: "Immediate",
+      carryForwardEligible: false,
+      maxCarryForwardDays: 0,
+      expirationPeriodMonths: 12,
+      requiresSupportingDocument: true,
+      status: "Active"
+    },
+    {
+      id: "LT004",
+      name: "Paternity Leave",
+      code: "PL",
+      description: "Paid leave for male employees upon the birth of a child.",
+      annualEntitlement: 5,
+      isPaid: true,
+      accrualRule: "Immediate",
+      carryForwardEligible: false,
+      maxCarryForwardDays: 0,
+      expirationPeriodMonths: 12,
+      requiresSupportingDocument: true,
+      status: "Active"
+    },
+    {
+      id: "LT005",
+      name: "Compassionate Leave",
+      code: "CL",
+      description: "Paid leave for bereavement or family emergency.",
+      annualEntitlement: 7,
+      isPaid: true,
+      accrualRule: "Immediate",
+      carryForwardEligible: false,
+      maxCarryForwardDays: 0,
+      expirationPeriodMonths: 12,
+      requiresSupportingDocument: false,
+      status: "Active"
+    },
+    {
+      id: "LT006",
+      name: "Unpaid Leave",
+      code: "UL",
+      description: "Approved leave of absence without remuneration.",
+      annualEntitlement: 30,
+      isPaid: false,
+      accrualRule: "Immediate",
+      carryForwardEligible: false,
+      maxCarryForwardDays: 0,
+      expirationPeriodMonths: 12,
+      requiresSupportingDocument: false,
+      status: "Active"
+    },
+    {
+      id: "LT007",
+      name: "Other Leave",
+      code: "OL",
+      description: "Special discretionary leave authorized by executive HR management.",
+      annualEntitlement: 10,
+      isPaid: true,
+      accrualRule: "Immediate",
+      carryForwardEligible: false,
+      maxCarryForwardDays: 0,
+      expirationPeriodMonths: 12,
+      requiresSupportingDocument: false,
+      status: "Active"
+    }
+  ],
+  leaveYearConfig: {
+    id: "LY2026",
+    yearName: "2026",
+    startDate: "2026-01-01",
+    endDate: "2026-12-31",
+    isCustomYear: false,
+    workingDays: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+    status: "Active",
+    processedYearEnd: false
+  },
+  medicalPolicyConfig: {
+    defaultFamilyAllocationETB: 100000,
+    employeeAllocationUnlimited: true,
+    requiresInvoiceNumber: true,
+    currencySymbol: "ETB"
   }
 };
 
-export const DEFAULT_ACTIVITY_LOGS: ActivityLog[] = [
-  {
-    id: "LOG001",
-    timestamp: "2026-09-04 08:30:00",
-    userId: "U001",
-    userEmail: "admin@ethio-re.com",
-    userRole: "Administrator",
-    module: "Auth",
-    action: "User Login",
-    recordEntity: "admin@ethio-re.com",
-    details: "Administrator logged in from security endpoint."
-  },
-  {
-    id: "LOG002",
-    timestamp: "2026-09-04 09:00:00",
-    userId: "U002",
-    userEmail: "hr@ethio-re.com",
-    userRole: "HR Officer",
-    module: "Auth",
-    action: "User Login",
-    recordEntity: "hr@ethio-re.com",
-    details: "HR Officer logged in."
-  }
-];
+export const DEFAULT_FAMILY_MEMBERS: FamilyMember[] = [];
+
+export const DEFAULT_MEDICAL_EXPENSES: MedicalExpense[] = [];
+
+export const DEFAULT_ACTIVITY_LOGS: ActivityLog[] = [];

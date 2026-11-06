@@ -3,8 +3,31 @@ import {
   FolderPlus, Upload, Trash2, Search, ArrowLeft, ExternalLink, 
   FileText, Folder, Eye, CheckCircle2, RefreshCw, LogOut, Plus, Link as LinkIcon, User, Landmark, ShieldCheck, AlertCircle
 } from "lucide-react";
-import { GoogleAuthProvider, signInWithPopup, auth, signOut } from "../firebase";
+import firebaseConfig from "../../firebase-applet-config.json";
 import { Employee, Department } from "../types";
+
+declare global {
+  interface Window {
+    google?: any;
+  }
+}
+
+// Load Google Identity Services script dynamically
+const loadGisScript = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (window.google?.accounts?.oauth2) {
+      resolve();
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Google Identity Services SDK."));
+    document.head.appendChild(script);
+  });
+};
 
 // Local storage and Firestore collection for storing document associations
 export interface DriveAssociation {
@@ -93,26 +116,58 @@ export default function DocumentVault({
     setIsAuthenticating(true);
     setAuthError(null);
     try {
-      const provider = new GoogleAuthProvider();
-      // Scopes requested matching the exact parameters accepted by OAuth
-      provider.addScope("https://www.googleapis.com/auth/drive");
-      provider.addScope("https://www.googleapis.com/auth/drive.file");
-      provider.addScope("https://www.googleapis.com/auth/drive.metadata.readonly");
+      await loadGisScript();
 
-      const result = await signInWithPopup(auth, provider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (!credential?.accessToken) {
-        throw new Error("No Google access token received from sign-in.");
+      if (!window.google?.accounts?.oauth2) {
+        throw new Error("Google Identity Services library is unavailable.");
       }
 
-      cachedAccessToken = credential.accessToken;
-      setAccessToken(cachedAccessToken);
-      setGoogleUser(result.user);
-      onLogAction("DocumentVault", "Google Drive Auth", result.user.email || "", "Operator successfully connected Google Drive workspace credentials");
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: firebaseConfig.oAuthClientId,
+        scope: "https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly",
+        callback: async (response: any) => {
+          if (response.error) {
+            console.warn("GIS Token Notice:", response);
+            setAuthError(response.error_description || response.error || "Google authorization was not completed.");
+            setIsAuthenticating(false);
+            return;
+          }
+          if (response.access_token) {
+            cachedAccessToken = response.access_token;
+            setAccessToken(cachedAccessToken);
+            try {
+              const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+                headers: { Authorization: `Bearer ${response.access_token}` }
+              });
+              const info = await res.json();
+              setGoogleUser(info);
+              onLogAction("DocumentVault", "Google Drive Auth", info.email || "Google Workspace User", "Operator successfully connected Google Drive workspace credentials");
+            } catch {
+              setGoogleUser({ email: "Google Workspace Account" });
+            } finally {
+              setIsAuthenticating(false);
+            }
+          } else {
+            setAuthError("No access token returned from Google Sign-In.");
+            setIsAuthenticating(false);
+          }
+        },
+        error_callback: (err: any) => {
+          console.warn("GIS Auth window notice:", err);
+          const msg = err?.message || String(err || "");
+          if (msg.includes("Popup window closed") || err?.type === "popup_closed") {
+            setAuthError("Google authentication popup was closed before completion. Please click 'Connect Google Drive' when ready.");
+          } else {
+            setAuthError("Google authentication was blocked or interrupted. Please enable popups and try again.");
+          }
+          setIsAuthenticating(false);
+        }
+      });
+
+      client.requestAccessToken({ prompt: "select_account" });
     } catch (err: any) {
-      console.error("Google Sign-In Error:", err);
+      console.warn("Google Sign-In Notice:", err);
       setAuthError(err?.message || "Failed to establish a Google Drive session.");
-    } finally {
       setIsAuthenticating(false);
     }
   };

@@ -152,6 +152,49 @@
         "details": { "type": "string", "maxLength": 1024 }
       },
       "required": ["id", "timestamp", "userId", "userEmail", "userRole", "module", "action", "recordEntity", "details"]
+    },
+    "FamilyMember": {
+      "title": "FamilyMember",
+      "description": "An employee family member or dependent record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "employeeId": { "type": "string", "maxLength": 128 },
+        "fullName": { "type": "string", "maxLength": 256 },
+        "relationship": { "type": "string", "maxLength": 64 },
+        "gender": { "type": "string", "enum": ["Male", "Female"] },
+        "dob": { "type": "string", "maxLength": 16 },
+        "phoneNumber": { "type": "string", "maxLength": 32 },
+        "medicalEligibility": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["Active", "Inactive"] },
+        "createdDate": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "employeeId", "fullName", "relationship", "gender", "dob", "medicalEligibility", "status", "createdDate"]
+    },
+    "MedicalExpense": {
+      "title": "MedicalExpense",
+      "description": "A healthcare expense claim record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "employeeId": { "type": "string", "maxLength": 128 },
+        "employeeName": { "type": "string", "maxLength": 256 },
+        "beneficiaryType": { "type": "string", "enum": ["Employee", "Family Member"] },
+        "beneficiaryId": { "type": "string", "maxLength": 128 },
+        "beneficiaryName": { "type": "string", "maxLength": 256 },
+        "relationship": { "type": "string", "maxLength": 64 },
+        "serviceDescription": { "type": "string", "maxLength": 512 },
+        "providerName": { "type": "string", "maxLength": 256 },
+        "expenseDate": { "type": "string", "maxLength": 16 },
+        "invoiceNumber": { "type": "string", "maxLength": 128 },
+        "amountETB": { "type": "number" },
+        "receiptAttachmentUrl": { "type": "string", "maxLength": 1024 },
+        "remarks": { "type": "string", "maxLength": 512 },
+        "status": { "type": "string", "enum": ["Paid", "Pending", "Rejected"] },
+        "recordedBy": { "type": "string", "maxLength": 256 },
+        "createdDate": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "employeeId", "employeeName", "beneficiaryType", "beneficiaryName", "relationship", "serviceDescription", "providerName", "expenseDate", "invoiceNumber", "amountETB", "status", "recordedBy", "createdDate"]
     }
   },
   "firestore": {
@@ -186,6 +229,14 @@
     "logs": {
       "schema": "ActivityLog",
       "description": "Immutable auditing logs"
+    },
+    "family_members": {
+      "schema": "FamilyMember",
+      "description": "Employee registered family dependents"
+    },
+    "medical_expenses": {
+      "schema": "MedicalExpense",
+      "description": "Medical expense claims registry"
     }
   }
 }

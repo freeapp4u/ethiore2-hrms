@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { CompanyConfig, User, PublicHoliday, UserRole, AccountStatus } from "../types";
+import { CompanyConfig, User, PublicHoliday, UserRole, AccountStatus, Employee } from "../types";
 import { 
   Building, Palette, Calendar, ShieldCheck, Users2, Plus, Edit, 
-  Trash2, X, Save, Key, ShieldAlert, CheckCircle2, UserCheck, UserMinus, Eye, Mail 
+  Trash2, X, Save, Key, ShieldAlert, CheckCircle2, UserCheck, UserMinus, Eye, Mail, UserPlus
 } from "lucide-react";
 
 interface SettingsProps {
   config: CompanyConfig;
   users: User[];
+  employees?: Employee[];
   holidays: PublicHoliday[];
   currentUser: User | null;
   initialSubTab?: string;
@@ -20,6 +21,7 @@ interface SettingsProps {
 export default function Settings({
   config,
   users,
+  employees = [],
   holidays,
   currentUser,
   initialSubTab,
@@ -71,6 +73,7 @@ export default function Settings({
   const [userRole, setUserRole] = useState<UserRole>("HR Officer");
   const [userStatus, setUserStatus] = useState<AccountStatus>("Active");
   const [userEmailVerified, setUserEmailVerified] = useState(false);
+  const [userEmployeeId, setUserEmployeeId] = useState("");
 
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
@@ -174,6 +177,7 @@ export default function Settings({
     setUserRole("HR Officer");
     setUserStatus("Active");
     setUserEmailVerified(false);
+    setUserEmployeeId("");
     setFormError("");
     setFormSuccess("");
     setEditUserMode(false);
@@ -188,6 +192,7 @@ export default function Settings({
     setUserRole(u.role);
     setUserStatus(u.status);
     setUserEmailVerified(!!u.emailVerified);
+    setUserEmployeeId(u.employeeId || "");
     setFormError("");
     setFormSuccess("");
     setEditUserMode(true);
@@ -241,6 +246,7 @@ export default function Settings({
             role: userRole,
             status: userStatus,
             emailVerified: userEmailVerified,
+            employeeId: userEmployeeId || undefined,
             // Only update password if a new one is typed
             ...(userPassword.trim() ? { password: userPassword.trim() } : {})
           };
@@ -276,6 +282,7 @@ export default function Settings({
         role: userRole,
         status: userStatus,
         emailVerified: userEmailVerified,
+        employeeId: userEmployeeId || undefined,
         createdDate: new Date().toISOString().split("T")[0]
       };
 
@@ -956,6 +963,23 @@ export default function Settings({
                     <option value="Pending Verification">Pending Verification</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Linked Employee Master Reference */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-700">Linked Employee Master Folder</label>
+                <select
+                  value={userEmployeeId}
+                  onChange={(e) => setUserEmployeeId(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg text-xs bg-white ring-primary-custom font-semibold text-slate-800"
+                >
+                  <option value="">-- No Direct Employee Link (System Account) --</option>
+                  {employees.filter(emp => emp.status === "Active").map(emp => (
+                    <option key={emp.employeeId} value={emp.employeeId}>
+                      {emp.fullName} ({emp.employeeId} - {emp.position})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Email Verified Toggle */}

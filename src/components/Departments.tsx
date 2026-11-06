@@ -34,6 +34,8 @@ export default function Departments({
   const [deptCode, setDeptCode] = useState("");
   const [description, setDescription] = useState("");
   const [deptStatus, setDeptStatus] = useState<"Active" | "Inactive">("Active");
+  const [headEmployeeId, setHeadEmployeeId] = useState("");
+  const [parentDepartmentId, setParentDepartmentId] = useState("");
 
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
@@ -49,6 +51,8 @@ export default function Departments({
     setDeptCode("");
     setDescription("");
     setDeptStatus("Active");
+    setHeadEmployeeId("");
+    setParentDepartmentId("");
     setFormError("");
     setFormSuccess("");
   };
@@ -65,6 +69,8 @@ export default function Departments({
     setDeptCode(d.code);
     setDescription(d.description);
     setDeptStatus(d.status);
+    setHeadEmployeeId(d.headEmployeeId || "");
+    setParentDepartmentId(d.parentDepartmentId || "");
     setFormError("");
     setFormSuccess("");
     setEditModalOpen(true);
@@ -101,6 +107,8 @@ export default function Departments({
       code: deptCode.trim().toUpperCase(),
       description: description.trim(),
       status: deptStatus,
+      headEmployeeId: headEmployeeId || undefined,
+      parentDepartmentId: parentDepartmentId || undefined,
       createdDate: new Date().toISOString().replace("T", " ").substring(0, 19),
       updatedDate: new Date().toISOString().replace("T", " ").substring(0, 19)
     };
@@ -135,6 +143,15 @@ export default function Departments({
 
     if (!selectedDept) return;
 
+    // Safeguard: Check if trying to deactivate a department with active assigned employees
+    if (deptStatus === "Inactive") {
+      const assignedActiveEmps = employees.filter(emp => emp.departmentId === selectedDept.id && emp.status === "Active").length;
+      if (assignedActiveEmps > 0) {
+        setFormError(`Cannot set Department to Inactive: There are ${assignedActiveEmps} active employees assigned. Reassign employees before deactivating.`);
+        return;
+      }
+    }
+
     // Check uniqueness excluding self
     const nameExists = departments.some(
       d => d.id !== selectedDept.id && d.name.toLowerCase() === deptName.trim().toLowerCase()
@@ -158,6 +175,8 @@ export default function Departments({
       code: deptCode.trim().toUpperCase(),
       description: description.trim(),
       status: deptStatus,
+      headEmployeeId: headEmployeeId || undefined,
+      parentDepartmentId: parentDepartmentId || undefined,
       updatedDate: new Date().toISOString().replace("T", " ").substring(0, 19)
     };
 
@@ -259,7 +278,30 @@ export default function Departments({
                   </div>
 
                   <h3 className="font-extrabold text-slate-800 mt-2 text-sm md:text-base leading-tight truncate">{dept.name}</h3>
-                  <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 min-h-[2.2rem] font-medium leading-relaxed">
+                  
+                  {/* Department Head & Parent Badges */}
+                  <div className="flex flex-wrap gap-1.5 mt-2 text-[10px]">
+                    {dept.headEmployeeId && (() => {
+                      const headEmp = employees.find(e => e.employeeId === dept.headEmployeeId);
+                      return (
+                        <span className="bg-sky-50 text-sky-800 border border-sky-200 px-2 py-0.5 rounded font-semibold flex items-center gap-1" title="Department Head">
+                          <span>Head:</span>
+                          <span className="font-bold">{headEmp ? headEmp.fullName : dept.headEmployeeId}</span>
+                        </span>
+                      );
+                    })()}
+                    {dept.parentDepartmentId && (() => {
+                      const parentDept = departments.find(d => d.id === dept.parentDepartmentId);
+                      return (
+                        <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded font-semibold flex items-center gap-1" title="Parent Department">
+                          <span>Parent:</span>
+                          <span className="font-bold">{parentDept ? parentDept.name : dept.parentDepartmentId}</span>
+                        </span>
+                      );
+                    })()}
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 mt-2 line-clamp-2 min-h-[2.2rem] font-medium leading-relaxed">
                     {dept.description || "No description provided."}
                   </p>
                 </div>
@@ -352,6 +394,39 @@ export default function Departments({
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">Department Head (Master)</label>
+                  <select
+                    value={headEmployeeId}
+                    onChange={(e) => setHeadEmployeeId(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-xs bg-white ring-primary-custom"
+                  >
+                    <option value="">-- No Head Assigned --</option>
+                    {employees.filter(e => e.status === "Active").map(emp => (
+                      <option key={emp.employeeId} value={emp.employeeId}>
+                        {emp.fullName} ({emp.employeeId})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">Parent Department</label>
+                  <select
+                    value={parentDepartmentId}
+                    onChange={(e) => setParentDepartmentId(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-xs bg-white ring-primary-custom"
+                  >
+                    <option value="">-- Top Level (Root) --</option>
+                    {departments.filter(d => d.status === "Active").map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-slate-700">Description</label>
                 <textarea
@@ -438,6 +513,39 @@ export default function Departments({
                   >
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">Department Head (Master)</label>
+                  <select
+                    value={headEmployeeId}
+                    onChange={(e) => setHeadEmployeeId(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-xs bg-white ring-primary-custom"
+                  >
+                    <option value="">-- No Head Assigned --</option>
+                    {employees.filter(e => e.status === "Active").map(emp => (
+                      <option key={emp.employeeId} value={emp.employeeId}>
+                        {emp.fullName} ({emp.employeeId})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">Parent Department</label>
+                  <select
+                    value={parentDepartmentId}
+                    onChange={(e) => setParentDepartmentId(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-xs bg-white ring-primary-custom"
+                  >
+                    <option value="">-- Top Level (Root) --</option>
+                    {departments.filter(d => d.status === "Active" && d.id !== selectedDept?.id).map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.code})
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>

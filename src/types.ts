@@ -11,6 +11,7 @@ export interface User {
   password?: string;
   role: UserRole;
   status: AccountStatus;
+  employeeId?: string; // Optional reference linking system user to Employee Master
   createdDate: string;
   lastLogin?: string;
   emailVerified?: boolean;
@@ -22,6 +23,8 @@ export interface Department {
   code: string;
   description: string;
   status: "Active" | "Inactive";
+  headEmployeeId?: string; // Optional reference to Employee Master for Department Head
+  parentDepartmentId?: string; // Optional reference to Department Admin for Parent Department
   createdDate: string;
   updatedDate: string;
 }
@@ -72,12 +75,99 @@ export interface LeaveRecord {
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
   daysCount: number;
+  isHalfDay?: boolean;
+  halfDayPeriod?: "Morning" | "Afternoon";
   reason: string;
   status: LeaveStatus;
   remarks: string;
+  supportingDocumentUrl?: string;
   recordedBy: string;
   createdDate: string;
   updatedDate: string;
+}
+
+export interface LeaveTypeConfig {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+  annualEntitlement: number;
+  isPaid: boolean;
+  accrualRule: "Annual" | "Monthly" | "Immediate";
+  carryForwardEligible: boolean;
+  maxCarryForwardDays: number;
+  expirationPeriodMonths: number; // 0 = never, 6, 12, 24
+  requiresSupportingDocument: boolean;
+  status: "Active" | "Inactive";
+}
+
+export interface LeaveYearConfig {
+  id: string;
+  yearName: string; // e.g. "2026"
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  isCustomYear: boolean;
+  workingDays: string[]; // e.g. ["Mon", "Tue", "Wed", "Thu", "Fri"]
+  status: "Active" | "Closed" | "Archived";
+  processedYearEnd?: boolean;
+  processedDate?: string;
+  processedBy?: string;
+}
+
+export interface EmployeeLeaveBalance {
+  id: string;
+  employeeId: string;
+  leaveTypeId: string;
+  leaveTypeName: string;
+  leaveYear: string; // e.g. "2026"
+  openingBalance: number;
+  annualEntitlement: number;
+  carriedForwardBalance: number;
+  leaveUtilized: number;
+  expiredLeave: number;
+  remainingBalance: number;
+  expirationDate?: string;
+  upcomingExpiringDays?: number;
+  lastUpdated: string;
+}
+
+export interface LeaveBalanceAdjustment {
+  id: string;
+  employeeId: string;
+  leaveTypeId: string;
+  leaveTypeName: string;
+  leaveYear: string;
+  adjustmentType: "Manual Adjustment" | "Year-End Carry Forward" | "Expiration" | "System Reset";
+  amount: number; // positive or negative
+  previousRemaining: number;
+  newRemaining: number;
+  reason: string;
+  performedBy: string;
+  timestamp: string;
+}
+
+export interface YearEndProcessingRecord {
+  id: string;
+  fromYear: string;
+  toYear: string;
+  processedDate: string;
+  processedBy: string;
+  totalEmployeesProcessed: number;
+  totalCarriedForwardDays: number;
+  totalExpiredDays: number;
+  details: {
+    employeeId: string;
+    employeeName: string;
+    departmentName: string;
+    leaveType: string;
+    prevOpening: number;
+    entitlement: number;
+    utilized: number;
+    unused: number;
+    eligibleCarryForward: number;
+    expired: number;
+    newOpening: number;
+  }[];
 }
 
 export interface PublicHoliday {
@@ -110,6 +200,54 @@ export interface CompanyConfig {
   profile: CompanyProfile;
   branding: BrandingConfig;
   leaveAllocations: { [leaveType: string]: number };
+  leaveTypesConfig?: LeaveTypeConfig[];
+  leaveYearConfig?: LeaveYearConfig;
+  medicalPolicyConfig?: MedicalPolicyConfig;
+}
+
+export type RelationshipType = "Spouse" | "Child" | "Parent" | "Dependent" | "Other";
+
+export interface FamilyMember {
+  id: string;
+  employeeId: string; // references Employee.employeeId
+  fullName: string;
+  relationship: RelationshipType;
+  gender: "Male" | "Female";
+  dob: string; // YYYY-MM-DD
+  phoneNumber?: string;
+  medicalEligibility: boolean;
+  status: "Active" | "Inactive";
+  createdDate: string;
+  updatedDate: string;
+}
+
+export interface MedicalExpense {
+  id: string;
+  employeeId: string; // references Employee.employeeId
+  employeeName: string;
+  beneficiaryType: "Employee" | "Family Member";
+  familyMemberId?: string; // references FamilyMember.id if Family Member
+  beneficiaryName: string;
+  relationship: "Self" | RelationshipType;
+  medicalService: string; // Description of medical service or expense
+  facilityName: string; // Hospital or clinic name
+  expenseDate: string; // YYYY-MM-DD
+  invoiceNumber: string;
+  amountETB: number;
+  supportingDocumentUrl?: string;
+  remarks?: string;
+  recordedBy: string;
+  createdDate: string;
+  updatedDate: string;
+}
+
+export interface MedicalPolicyConfig {
+  defaultFamilyAllocationETB: number; // Default 100,000 ETB aggregate allocation per employee
+  employeeAllocationUnlimited: boolean; // true
+  requiresInvoiceNumber: boolean;
+  currencySymbol: string; // "ETB"
+  updatedBy?: string;
+  updatedDate?: string;
 }
 
 export interface ActivityLog {

@@ -1,10 +1,10 @@
-import { UserRole } from "../types";
 import { 
-  LayoutDashboard, UserCheck, CalendarDays, Settings, ShieldAlert, 
+  LayoutDashboard, UserCheck, CalendarDays,
   BarChart3, Users, Landmark, FileText, Palette, Calendar, 
-  Users2, Eye, ShieldCheck, History, ChevronDown, ChevronRight, X, FolderOpen
+  Users2, ShieldCheck, History, ChevronDown, ChevronRight, X, FolderOpen, HeartPulse
 } from "lucide-react";
 import { useState } from "react";
+import { UserRole } from "../types";
 
 interface SidebarProps {
   role: UserRole;
@@ -21,8 +21,9 @@ export default function Sidebar({
   onTabChange,
   isOpen,
   onClose,
-  companyName
 }: SidebarProps) {
+  const [leaveExpanded, setLeaveExpanded] = useState(true);
+  const [medicalExpanded, setMedicalExpanded] = useState(true);
   const [settingsExpanded, setSettingsExpanded] = useState(true);
   const [adminExpanded, setAdminExpanded] = useState(true);
 
@@ -109,21 +110,133 @@ export default function Sidebar({
                   Attendance
                 </button>
 
-                <button
-                  onClick={() => navigateTo("leaves")}
-                  className={navItemClass("leaves")}
-                >
-                  <CalendarDays className="h-4 w-4 shrink-0" />
-                  Leave Management
-                </button>
+                {/* Leave Management */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => navigateTo("leaves_dashboard")}
+                      className={`flex-1 text-left py-2.5 flex items-center gap-3 text-xs font-semibold tracking-wide transition-all ${
+                        activeTab.startsWith("leaves")
+                          ? "bg-accent-custom/20 text-accent-custom border-l-4 border-accent-custom pl-4 pr-1 rounded-r font-bold"
+                          : "text-slate-300 hover:bg-white/10 hover:text-white pl-5 pr-1 rounded"
+                      }`}
+                    >
+                      <CalendarDays className="h-4 w-4 shrink-0 text-amber-400" />
+                      <span>Leave Management</span>
+                    </button>
+                    <button
+                      onClick={() => setLeaveExpanded(!leaveExpanded)}
+                      className="p-2 text-slate-400 hover:text-white"
+                      title="Toggle Leave Submenus"
+                    >
+                      {leaveExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
 
-                <button
-                  onClick={() => navigateTo("documents")}
-                  className={navItemClass("documents")}
-                >
-                  <FolderOpen className="h-4 w-4 shrink-0 text-sky-400" />
-                  Document Vault
-                </button>
+                  {leaveExpanded && (
+                    <div className="space-y-0.5 pl-2 border-l border-white/10 ml-5 my-1">
+                      <button
+                        onClick={() => navigateTo("leaves_dashboard")}
+                        className={subNavItemClass("leaves_dashboard")}
+                      >
+                        Leave Dashboard
+                      </button>
+                      <button
+                        onClick={() => navigateTo("leaves_applications")}
+                        className={subNavItemClass("leaves_applications")}
+                      >
+                        Leave Applications
+                      </button>
+                      <button
+                        onClick={() => navigateTo("leaves_balances")}
+                        className={subNavItemClass("leaves_balances")}
+                      >
+                        Leave Balances
+                      </button>
+                      <button
+                        onClick={() => navigateTo("leaves_calendar")}
+                        className={subNavItemClass("leaves_calendar")}
+                      >
+                        Leave Calendar
+                      </button>
+                      {role === "Administrator" && (
+                        <button
+                          onClick={() => navigateTo("leaves_config")}
+                          className={subNavItemClass("leaves_config")}
+                        >
+                          Leave Configuration
+                        </button>
+                      )}
+                      <button
+                        onClick={() => navigateTo("leaves_reports")}
+                        className={subNavItemClass("leaves_reports")}
+                      >
+                        Leave Reports
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Medical & Health Management */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => navigateTo("medical_dashboard")}
+                      className={`flex-1 text-left py-2.5 flex items-center gap-3 text-xs font-semibold tracking-wide transition-all ${
+                        activeTab.startsWith("medical")
+                          ? "bg-accent-custom/20 text-accent-custom border-l-4 border-accent-custom pl-4 pr-1 rounded-r font-bold"
+                          : "text-slate-300 hover:bg-white/10 hover:text-white pl-5 pr-1 rounded"
+                      }`}
+                    >
+                      <HeartPulse className="h-4 w-4 shrink-0 text-rose-400" />
+                      <span>Medical &amp; Health</span>
+                    </button>
+                    <button
+                      onClick={() => setMedicalExpanded(!medicalExpanded)}
+                      className="p-2 text-slate-400 hover:text-white"
+                      title="Toggle Medical Submenus"
+                    >
+                      {medicalExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+
+                  {medicalExpanded && (
+                    <div className="space-y-0.5 pl-2 border-l border-white/10 ml-5 my-1">
+                      <button
+                        onClick={() => navigateTo("medical_dashboard")}
+                        className={subNavItemClass("medical_dashboard")}
+                      >
+                        Medical Dashboard
+                      </button>
+                      <button
+                        onClick={() => navigateTo("medical_claims")}
+                        className={subNavItemClass("medical_claims")}
+                      >
+                        Expense Claims
+                      </button>
+                      <button
+                        onClick={() => navigateTo("medical_family")}
+                        className={subNavItemClass("medical_family")}
+                      >
+                        Family Registry
+                      </button>
+                      {role === "Administrator" && (
+                        <button
+                          onClick={() => navigateTo("medical_policy")}
+                          className={subNavItemClass("medical_policy")}
+                        >
+                          Policy Settings
+                        </button>
+                      )}
+                      <button
+                        onClick={() => navigateTo("medical_reports")}
+                        className={subNavItemClass("medical_reports")}
+                      >
+                        Medical Reports
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

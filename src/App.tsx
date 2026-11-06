@@ -12,7 +12,8 @@ import {
 } from "./firebase";
 import { 
   User, Department, Employee, AttendanceRecord, LeaveRecord, 
-  PublicHoliday, CompanyConfig, ActivityLog, UserRole, AccountStatus 
+  PublicHoliday, CompanyConfig, ActivityLog, UserRole, AccountStatus,
+  FamilyMember, MedicalExpense
 } from "./types";
 
 // Component Imports
@@ -24,6 +25,7 @@ import Employees from "./components/Employees";
 import Departments from "./components/Departments";
 import Attendance from "./components/Attendance";
 import LeaveManagement from "./components/LeaveManagement";
+import MedicalManagement from "./components/MedicalManagement";
 import Settings from "./components/Settings";
 import Reports from "./components/Reports";
 import HelpCenter from "./components/HelpCenter";
@@ -40,6 +42,8 @@ export default function App() {
   const [holidays, setHolidays] = useState<PublicHoliday[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [medicalExpenses, setMedicalExpenses] = useState<MedicalExpense[]>([]);
   const [config, setConfig] = useState<CompanyConfig | null>(null);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -82,6 +86,8 @@ export default function App() {
     setHolidays(state.holidays);
     setAttendance(state.attendance);
     setLeaves(state.leaves);
+    setFamilyMembers(state.familyMembers || []);
+    setMedicalExpenses(state.medicalExpenses || []);
     setConfig(state.config);
     setLogs(state.logs);
     setCurrentUser(state.currentUser);
@@ -162,6 +168,8 @@ export default function App() {
       holidays,
       attendance,
       leaves,
+      familyMembers,
+      medicalExpenses,
       config: config!,
       logs,
       currentUser
@@ -239,6 +247,8 @@ export default function App() {
       holidays,
       attendance,
       leaves,
+      familyMembers,
+      medicalExpenses,
       config: config!,
       logs,
       currentUser: updatedUser
@@ -456,6 +466,45 @@ export default function App() {
     const updated = leaves.map(l => l.id === rec.id ? rec : l);
     handleUpdateLeaves(updated);
     syncRecordToFirestore("leaves", rec.id, rec);
+  };
+
+  // Family Members & Medical Expenses CRUD
+  const handleUpdateFamilyMembersState = (newFms: FamilyMember[]) => {
+    setFamilyMembers(newFms);
+    saveState({ familyMembers: newFms });
+  };
+  const handleAddFamilyMember = (fm: FamilyMember): boolean => {
+    const updated = [...familyMembers, fm];
+    handleUpdateFamilyMembersState(updated);
+    syncRecordToFirestore("family_members", fm.id, fm);
+    return true;
+  };
+  const handleUpdateFamilyMember = (fm: FamilyMember) => {
+    const updated = familyMembers.map(item => item.id === fm.id ? fm : item);
+    handleUpdateFamilyMembersState(updated);
+    syncRecordToFirestore("family_members", fm.id, fm);
+  };
+
+  const handleUpdateMedicalExpensesState = (newExps: MedicalExpense[]) => {
+    setMedicalExpenses(newExps);
+    saveState({ medicalExpenses: newExps });
+  };
+  const handleAddMedicalExpense = (exp: MedicalExpense): boolean => {
+    const updated = [exp, ...medicalExpenses];
+    handleUpdateMedicalExpensesState(updated);
+    syncRecordToFirestore("medical_expenses", exp.id, exp);
+    return true;
+  };
+  const handleUpdateMedicalExpense = (exp: MedicalExpense) => {
+    const updated = medicalExpenses.map(item => item.id === exp.id ? exp : item);
+    handleUpdateMedicalExpensesState(updated);
+    syncRecordToFirestore("medical_expenses", exp.id, exp);
+  };
+  const handleDeleteMedicalExpense = (id: string): boolean => {
+    const updated = medicalExpenses.filter(item => item.id !== id);
+    handleUpdateMedicalExpensesState(updated);
+    deleteRecordFromFirestore("medical_expenses", id);
+    return true;
   };
 
   // Quick credentials loader for evaluator ease of access
@@ -794,9 +843,11 @@ export default function App() {
             <Employees
               employees={employees}
               departments={departments}
+              familyMembers={familyMembers}
               currentUser={currentUser}
               onAddEmployee={handleAddEmployee}
               onUpdateEmployee={handleUpdateEmployee}
+              onAddFamilyMember={handleAddFamilyMember}
               onLogAction={handleLogAction}
             />
           )}
@@ -825,16 +876,37 @@ export default function App() {
             />
           )}
 
-          {activeTab === "leaves" && (
+          {(activeTab === "leaves" || activeTab.startsWith("leaves")) && (
             <LeaveManagement
               leaves={leaves}
               employees={employees}
               departments={departments}
               holidays={holidays}
-              leaveAllocations={config.leaveAllocations}
+              companyConfig={config}
               currentUser={currentUser}
+              initialSubTab={activeTab.includes("_") ? activeTab.split("_")[1] : "dashboard"}
               onAddLeave={handleAddLeave}
               onUpdateLeave={handleUpdateLeaveRecord}
+              onUpdateConfig={handleUpdateConfig}
+              onLogAction={handleLogAction}
+            />
+          )}
+
+          {(activeTab === "medical" || activeTab.startsWith("medical")) && (
+            <MedicalManagement
+              employees={employees}
+              departments={departments}
+              familyMembers={familyMembers}
+              medicalExpenses={medicalExpenses}
+              companyConfig={config}
+              currentUser={currentUser}
+              initialSubTab={activeTab.includes("_") ? activeTab.split("_")[1] : "dashboard"}
+              onAddFamilyMember={handleAddFamilyMember}
+              onUpdateFamilyMember={handleUpdateFamilyMember}
+              onAddMedicalExpense={handleAddMedicalExpense}
+              onUpdateMedicalExpense={handleUpdateMedicalExpense}
+              onDeleteMedicalExpense={handleDeleteMedicalExpense}
+              onUpdateConfig={handleUpdateConfig}
               onLogAction={handleLogAction}
             />
           )}
@@ -844,6 +916,7 @@ export default function App() {
             <Settings
               config={config}
               users={users}
+              employees={employees}
               holidays={holidays}
               currentUser={currentUser}
               initialSubTab={activeTab.split("_")[1]}

@@ -2,60 +2,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Common helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    // Allow test connection check
-    match /test/{testId} {
-      allow read: if true;
-    }
-
-    // Users
-    match /users/{userId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-
-    // Departments
-    match /departments/{deptId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-
-    // Employees
-    match /employees/{employeeId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-
-    // Attendance
-    match /attendance/{attendanceId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-
-    // Leaves
-    match /leaves/{leaveId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-
-    // Holidays
-    match /holidays/{holidayId} {
-      allow read, create, update, delete: if isSignedIn();
-    }
-
-    // Config
-    match /config/{configId} {
-      allow read, write: if isSignedIn();
-    }
-
-    // Logs (Audit log - read and create for signed-in users)
-    match /logs/{logId} {
-      allow read, create: if isSignedIn();
-      allow update, delete: if false;
-    }
-
-    // Default deny catch-all
+    // Allow full read and write access for all collections in the applet environment
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }

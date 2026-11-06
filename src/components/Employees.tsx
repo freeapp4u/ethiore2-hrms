@@ -1,25 +1,64 @@
 import React, { useState } from "react";
-import { Employee, Department, User } from "../types";
+import { Employee, Department, User, FamilyMember } from "../types";
 import { 
   Plus, Search, SlidersHorizontal, Eye, Edit, UserX, UserCheck, 
-  X, Save, FileSpreadsheet, Printer, Download, EyeOff, FileText, ExternalLink
+  X, Save, FileSpreadsheet, Printer, Download, EyeOff, FileText, ExternalLink, Heart,
+  Upload, CheckCircle2, AlertCircle, FileUp, RefreshCw
 } from "lucide-react";
+
+interface ParsedImportRow {
+  rowIndex: number;
+  raw: Record<string, string>;
+  employeeObj?: Employee;
+  isValid: boolean;
+  errors: string[];
+}
+
+function parseCSVText(text: string): string[][] {
+  const lines: string[][] = [];
+  const rawLines = text.split(/\r\n|\n|\r/);
+  for (let rawLine of rawLines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const row: string[] = [];
+    let insideQuote = false;
+    let entry = "";
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        insideQuote = !insideQuote;
+      } else if (char === ',' && !insideQuote) {
+        row.push(entry.trim().replace(/^"|"$/g, ''));
+        entry = "";
+      } else {
+        entry += char;
+      }
+    }
+    row.push(entry.trim().replace(/^"|"$/g, ''));
+    lines.push(row);
+  }
+  return lines;
+}
 
 interface EmployeesProps {
   employees: Employee[];
   departments: Department[];
+  familyMembers?: FamilyMember[];
   currentUser: User | null;
   onAddEmployee: (emp: Employee) => boolean;
   onUpdateEmployee: (emp: Employee) => void;
+  onAddFamilyMember?: (fm: FamilyMember) => boolean;
   onLogAction: (module: string, action: string, record: string, details: string) => void;
 }
 
 export default function Employees({
   employees,
   departments,
+  familyMembers = [],
   currentUser,
   onAddEmployee,
   onUpdateEmployee,
+  onAddFamilyMember,
   onLogAction
 }: EmployeesProps) {
   // Search & Filter States
@@ -27,6 +66,16 @@ export default function Employees({
   const [filterDepartment, setFilterDepartment] = useState("");
   const [filterType, setFilterType] = useState("");
   const [filterStatus, setFilterStatus] = useState("Active"); // Default to Active
+
+  // CSV Import States
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importSummaryOpen, setImportSummaryOpen] = useState(false);
+  const [selectedFileName, setSelectedFileName] = useState("");
+  const [importRows, setImportRows] = useState<ParsedImportRow[]>([]);
+  const [isProcessingImport, setIsProcessingImport] = useState(false);
+  const [importSuccessCount, setImportSuccessCount] = useState(0);
+  const [importFailCount, setImportFailCount] = useState(0);
+  const [importDuplicateCount, setImportDuplicateCount] = useState(0);
 
   // Dialog States
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -272,7 +321,269 @@ export default function Employees({
     );
   };
 
-  // Simulating exports & printing
+  // Download CSV Import Template
+  const handleDownloadTemplate = () => {
+    const headers = [
+      "EmployeeID", "FirstName", "MiddleName", "LastName", "Gender",
+      "DateOfBirth", "EmploymentDate", "Email", "PhoneNumber",
+      "DepartmentCode", "JobTitle", "EmploymentType", "EmploymentStatus", "BasicSalary"
+    ].join(",");
+    
+    const sampleComment = "# ETHIO-RE HRMS EMPLOYEE BULK IMPORT TEMPLATE\r\n# WARNING: Please delete this sample row (EMP999) before uploading actual employee records!";
+    const sampleRow = [
+      "EMP999", "Abebe", "Kebede", "Tessema", "Male",
+      "1992-04-15", "2026-01-01", "abebe.kebede@ethiopianre.com", "+251-911-000000",
+      "HRAD", "Senior Underwriter", "Permanent", "Active", "25000"
+    ].join(",");
+
+    const csvContent = `${sampleComment}\r\n${headers}\r\n${sampleRow}\r\n`;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "ethiore_employee_import_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Upload and Parse CSV File
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSelectedFileName(file.name);
+    setIsProcessingImport(true);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result as string;
+      if (!text) {
+        setIsProcessingImport(false);
+        return;
+      }
+
+      const lines = parseCSVText(text);
+      if (lines.length < 2) {
+        alert("Uploaded CSV file is empty or missing valid headers.");
+        setIsProcessingImport(false);
+        return;
+      }
+
+      const header = lines[0].map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
+      const dataLines = lines.slice(1);
+
+      const parsed: ParsedImportRow[] = [];
+      const seenEmpIdsInCsv = new Set<string>();
+      let dupCount = 0;
+
+      dataLines.forEach((row, idx) => {
+        if (row.length === 0 || (row.length === 1 && !row[0].trim())) return;
+
+        const raw: Record<string, string> = {};
+        header.forEach((hName, colIdx) => {
+          raw[hName] = row[colIdx] ? row[colIdx].trim() : "";
+        });
+
+        // Extract key fields with fallback aliases
+        const empId = (raw["employeeid"] || raw["id"] || raw["empid"] || "").toUpperCase();
+        const fName = raw["firstname"] || raw["first"] || raw["name"] || "";
+        const mName = raw["middlename"] || raw["middle"] || "";
+        const lName = raw["lastname"] || raw["last"] || "";
+        const gInput = (raw["gender"] || "Male").trim();
+        const dobInput = raw["dateofbirth"] || raw["dob"] || raw["birthdate"] || "1990-01-01";
+        const hireInput = raw["employmentdate"] || raw["hiredate"] || raw["employmentdate"] || new Date().toISOString().split("T")[0];
+        const emailInput = raw["email"] || raw["workemail"] || "";
+        const phoneInput = raw["phonenumber"] || raw["phone"] || raw["contact"] || "+251-900-000000";
+        const deptCodeInput = (raw["departmentcode"] || raw["department"] || raw["deptcode"] || "").toUpperCase();
+        const positionInput = raw["jobtitle"] || raw["position"] || raw["title"] || "Staff Officer";
+        const empTypeInput = raw["employmenttype"] || raw["type"] || "Permanent";
+        const empStatusInput = raw["employmentstatus"] || raw["status"] || "Active";
+        const salaryInput = raw["basicsalary"] || raw["salary"] || "";
+
+        const rowErrors: string[] = [];
+
+        // 1. Mandatory Employee ID
+        if (!empId) {
+          rowErrors.push("EmployeeID is mandatory and missing.");
+        } else {
+          // Check for sample placeholder record
+          if (empId === "EMP999") {
+            rowErrors.push("Sample placeholder row (EMP999) must be removed before actual import.");
+          }
+          // Uniqueness check within CSV
+          if (seenEmpIdsInCsv.has(empId)) {
+            rowErrors.push(`Duplicate EmployeeID '${empId}' within uploaded CSV file.`);
+            dupCount++;
+          } else {
+            seenEmpIdsInCsv.add(empId);
+          }
+
+          // Uniqueness check against existing system records
+          const existsInSystem = employees.some(e => e.employeeId.toUpperCase() === empId);
+          if (existsInSystem) {
+            rowErrors.push(`EmployeeID '${empId}' is already registered in existing Employee Master.`);
+            dupCount++;
+          }
+        }
+
+        // 2. Mandatory Names
+        if (!fName) rowErrors.push("FirstName is required.");
+        if (!lName) rowErrors.push("LastName is required.");
+
+        // 3. Department Code validation
+        let matchedDeptId = "";
+        if (!deptCodeInput) {
+          rowErrors.push("DepartmentCode is required.");
+        } else {
+          const matchedDept = departments.find(d => 
+            d.code.toUpperCase() === deptCodeInput || d.id.toUpperCase() === deptCodeInput
+          );
+          if (matchedDept) {
+            matchedDeptId = matchedDept.id;
+          } else {
+            rowErrors.push(`DepartmentCode '${deptCodeInput}' does not exist in Department Admin.`);
+          }
+        }
+
+        // 4. Gender Validation
+        let genderVal: "Male" | "Female" = "Male";
+        if (gInput.toLowerCase().startsWith("f")) {
+          genderVal = "Female";
+        } else if (gInput.toLowerCase().startsWith("m")) {
+          genderVal = "Male";
+        } else {
+          rowErrors.push(`Invalid Gender '${gInput}'. Must be Male or Female.`);
+        }
+
+        // 5. Employment Type Validation
+        let typeVal: "Permanent" | "Contract" | "Temporary" | "Intern" = "Permanent";
+        const typeNorm = empTypeInput.toLowerCase();
+        if (typeNorm.includes("perm")) typeVal = "Permanent";
+        else if (typeNorm.includes("cont")) typeVal = "Contract";
+        else if (typeNorm.includes("temp")) typeVal = "Temporary";
+        else if (typeNorm.includes("intern")) typeVal = "Intern";
+        else {
+          rowErrors.push(`Invalid EmploymentType '${empTypeInput}'. Must be Permanent, Contract, Temporary, or Intern.`);
+        }
+
+        // 6. Status Validation
+        let statusVal: "Active" | "Inactive" = "Active";
+        if (empStatusInput.toLowerCase().startsWith("in")) {
+          statusVal = "Inactive";
+        }
+
+        // 7. Salary Numeric Validation
+        if (salaryInput && isNaN(Number(salaryInput))) {
+          rowErrors.push(`BasicSalary '${salaryInput}' must be numeric.`);
+        }
+
+        const fullNameVal = `${fName} ${mName ? mName + " " : ""}${lName}`.trim();
+        const isValid = rowErrors.length === 0;
+
+        let employeeObj: Employee | undefined = undefined;
+        if (isValid) {
+          employeeObj = {
+            employeeId: empId,
+            firstName: fName,
+            middleName: mName,
+            lastName: lName,
+            fullName: fullNameVal,
+            gender: genderVal,
+            dob: dobInput,
+            email: emailInput,
+            phoneNumber: phoneInput,
+            address: "Addis Ababa, Ethiopia",
+            departmentId: matchedDeptId,
+            position: positionInput,
+            employmentType: typeVal,
+            hireDate: hireInput,
+            status: statusVal,
+            category: salaryInput ? `Salary: ETB ${Number(salaryInput).toLocaleString()}` : "",
+            createdDate: new Date().toISOString().replace("T", " ").substring(0, 19),
+            createdBy: currentUser?.email || "hr@ethio-re.com",
+            updatedDate: new Date().toISOString().replace("T", " ").substring(0, 19),
+            updatedBy: currentUser?.email || "hr@ethio-re.com"
+          };
+        }
+
+        parsed.push({
+          rowIndex: idx + 2,
+          raw: {
+            empId, fName, mName, lName, gender: genderVal, dobInput, hireInput,
+            emailInput, phoneInput, deptCodeInput, positionInput, empTypeInput, empStatusInput, salaryInput
+          },
+          employeeObj,
+          isValid,
+          errors: rowErrors
+        });
+      });
+
+      setImportRows(parsed);
+      setImportDuplicateCount(dupCount);
+      setIsProcessingImport(false);
+    };
+    reader.readAsText(file);
+  };
+
+  // Download Rejected / Error CSV Log
+  const handleDownloadRejectedCSV = () => {
+    const rejectedRows = importRows.filter(r => !r.isValid);
+    if (rejectedRows.length === 0) {
+      alert("No rejected records found.");
+      return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,RowNumber,EmployeeID,FirstName,LastName,DepartmentCode,ValidationErrors\r\n";
+    rejectedRows.forEach(r => {
+      const errs = r.errors.join("; ").replace(/"/g, '""');
+      csvContent += `"${r.rowIndex}","${r.raw.empId || ""}","${r.raw.fName || ""}","${r.raw.lName || ""}","${r.raw.deptCodeInput || ""}","${errs}"\r\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `ethiore_rejected_import_records.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Execute Bulk Import for Valid Records
+  const handleExecuteImport = () => {
+    const validRows = importRows.filter(r => r.isValid && r.employeeObj);
+    if (validRows.length === 0) {
+      alert("No valid employee records to import.");
+      return;
+    }
+
+    let success = 0;
+    let fail = 0;
+
+    validRows.forEach(r => {
+      if (r.employeeObj) {
+        const ok = onAddEmployee(r.employeeObj);
+        if (ok) {
+          success++;
+        } else {
+          fail++;
+        }
+      }
+    });
+
+    onLogAction(
+      "Employee",
+      "Bulk Employee CSV Import",
+      `${success} Records`,
+      `Operator ${currentUser?.email} executed bulk CSV import. Successfully imported ${success} employees, ${fail} failed.`
+    );
+
+    setImportSuccessCount(success);
+    setImportFailCount(fail + (importRows.length - validRows.length));
+    setImportModalOpen(false);
+    setImportSummaryOpen(true);
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -304,6 +615,18 @@ export default function Employees({
           <p className="text-xs text-slate-500 mt-1">Manage, search, and register operational personnel folders.</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => {
+              setImportRows([]);
+              setSelectedFileName("");
+              setImportModalOpen(true);
+            }}
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all"
+            id="btn-import-employees-trigger"
+          >
+            <Upload className="h-4 w-4" />
+            <span>Import CSV</span>
+          </button>
           <button
             onClick={handleExportCSV}
             className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg transition-all"
@@ -1041,6 +1364,47 @@ export default function Employees({
                     </div>
                   </div>
 
+                  {/* Registered Family Members & Medical Benefits */}
+                  <div className="pt-4 border-t border-slate-100 col-span-2">
+                    {(() => {
+                      const empFms = familyMembers.filter(fm => fm.employeeId === selectedEmployee.employeeId);
+                      return (
+                        <>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                              <Heart className="h-3 w-3 text-rose-500" />
+                              <span>Registered Family Members &amp; Medical Dependents ({empFms.length})</span>
+                            </p>
+                          </div>
+                          {empFms.length === 0 ? (
+                            <p className="text-[11px] text-slate-400 font-medium italic">No family members registered under this employee's medical pool.</p>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {empFms.map(fm => (
+                                <div key={fm.id} className="p-2 bg-slate-50 border border-slate-200/70 rounded-lg flex items-center justify-between text-xs">
+                                  <div>
+                                    <span className="font-bold text-slate-800">{fm.fullName}</span>
+                                    <span className="ml-2 text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-medium">{fm.relationship}</span>
+                                    <div className="text-[10px] text-slate-400 mt-0.5">
+                                      {fm.gender} • DOB: {fm.dob} {fm.phoneNumber ? `• Phone: ${fm.phoneNumber}` : ""}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                      fm.medicalEligibility ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"
+                                    }`}>
+                                      {fm.medicalEligibility ? "Eligible" : "Ineligible"}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+
                   {/* Google Drive Attachments Integration */}
                   <div className="pt-4 border-t border-slate-100 col-span-2">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Google Drive Linked Documents ({driveAssocs.length})</p>
@@ -1092,6 +1456,251 @@ export default function Employees({
                 className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-200 hover:bg-slate-300 rounded-lg"
               >
                 Close Folder
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BULK CSV IMPORT MODAL */}
+      {importModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full my-8 overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            <div className="bg-primary-custom text-white px-6 py-4 flex items-center justify-between border-b shrink-0">
+              <div className="flex items-center gap-2">
+                <Upload className="h-5 w-5 text-accent-custom" />
+                <h3 className="font-extrabold text-sm tracking-wide uppercase">Bulk Import Employee Folders via CSV</h3>
+              </div>
+              <button onClick={() => setImportModalOpen(false)} className="text-white/80 hover:text-white rounded-full p-1 hover:bg-white/10">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
+              {/* Step 1: Template Download & File Upload Area */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="space-y-1 text-center sm:text-left">
+                  <h4 className="text-xs font-bold text-slate-800">1. Download System Template &amp; Select File</h4>
+                  <p className="text-[11px] text-slate-500">
+                    Use our standardized CSV template with Department codes and required fields. Remove the sample row (EMP999) before uploading.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleDownloadTemplate}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg shadow-2xs transition-all"
+                  >
+                    <Download className="h-4 w-4 text-primary-custom" />
+                    <span>Download CSV Template</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Upload Drop Zone / Input */}
+              <div className="border-2 border-dashed border-slate-300 hover:border-primary-custom rounded-xl p-6 text-center transition-colors bg-white">
+                <FileUp className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+                <p className="text-xs font-bold text-slate-700">Select CSV file for batch processing</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Supports standard UTF-8 encoded .csv files</p>
+                <div className="mt-3 flex justify-center">
+                  <label className="cursor-pointer px-4 py-2 bg-primary-custom hover:opacity-90 text-white text-xs font-bold rounded-lg shadow-2xs transition-all flex items-center gap-2">
+                    <Upload className="h-4 w-4 text-accent-custom" />
+                    <span>Choose CSV File</span>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                {selectedFileName && (
+                  <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-xs font-semibold">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span>Selected File: {selectedFileName}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Step 2: Validation Metrics & Summary Counters */}
+              {isProcessingImport && (
+                <div className="flex items-center justify-center py-6 gap-2 text-slate-600 text-xs font-bold">
+                  <RefreshCw className="h-5 w-5 animate-spin text-primary-custom" />
+                  <span>Parsing and validating employee CSV rows...</span>
+                </div>
+              )}
+
+              {importRows.length > 0 && !isProcessingImport && (
+                <div className="space-y-4">
+                  {/* Metric Badges */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3 bg-slate-100 border border-slate-200 rounded-lg text-center">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block">Total Found</span>
+                      <span className="text-lg font-extrabold text-slate-800">{importRows.length}</span>
+                    </div>
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-center">
+                      <span className="text-[10px] font-bold text-emerald-600 uppercase block">Valid &amp; Ready</span>
+                      <span className="text-lg font-extrabold text-emerald-700">
+                        {importRows.filter(r => r.isValid).length}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-center">
+                      <span className="text-[10px] font-bold text-rose-600 uppercase block">Invalid / Errors</span>
+                      <span className="text-lg font-extrabold text-rose-700">
+                        {importRows.filter(r => !r.isValid).length}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
+                      <span className="text-[10px] font-bold text-amber-600 uppercase block">Duplicate IDs</span>
+                      <span className="text-lg font-extrabold text-amber-700">{importDuplicateCount}</span>
+                    </div>
+                  </div>
+
+                  {/* Step 3: Row-by-Row Preview Table */}
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="bg-slate-100 px-4 py-2 border-b flex justify-between items-center">
+                      <h5 className="text-xs font-extrabold text-slate-700 uppercase tracking-wide">Import Preview &amp; Audit Log Validation</h5>
+                      <span className="text-[11px] text-slate-500 font-medium">Row-by-Row Verification</span>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-b text-[10px] font-bold text-slate-500 uppercase sticky top-0">
+                          <tr>
+                            <th className="px-3 py-2">Row</th>
+                            <th className="px-3 py-2">Emp ID</th>
+                            <th className="px-3 py-2">Name</th>
+                            <th className="px-3 py-2">Dept</th>
+                            <th className="px-3 py-2">Gender</th>
+                            <th className="px-3 py-2">Type</th>
+                            <th className="px-3 py-2 text-center">Status</th>
+                            <th className="px-3 py-2">Validation Errors</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {importRows.map((row) => (
+                            <tr key={row.rowIndex} className={row.isValid ? "hover:bg-slate-50" : "bg-rose-50/40"}>
+                              <td className="px-3 py-2 font-mono text-slate-500">{row.rowIndex}</td>
+                              <td className="px-3 py-2 font-bold text-slate-800">{row.raw.empId || "-"}</td>
+                              <td className="px-3 py-2 font-semibold text-slate-700">
+                                {row.raw.fName} {row.raw.lName}
+                              </td>
+                              <td className="px-3 py-2 text-slate-600">{row.raw.deptCodeInput || "-"}</td>
+                              <td className="px-3 py-2 text-slate-600">{row.raw.gender}</td>
+                              <td className="px-3 py-2 text-slate-600">{row.raw.empTypeInput}</td>
+                              <td className="px-3 py-2 text-center">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  row.isValid 
+                                    ? "bg-emerald-100 text-emerald-800" 
+                                    : "bg-rose-100 text-rose-800"
+                                }`}>
+                                  {row.isValid ? "Valid" : "Invalid"}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-[11px] text-rose-700 font-medium max-w-xs">
+                                {row.isValid ? (
+                                  <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                                    <CheckCircle2 className="h-3 w-3 inline" /> Ready for Import
+                                  </span>
+                                ) : (
+                                  <div className="space-y-0.5">
+                                    {row.errors.map((err, errIdx) => (
+                                      <div key={errIdx} className="flex items-start gap-1">
+                                        <AlertCircle className="h-3 w-3 text-rose-500 shrink-0 mt-0.5" />
+                                        <span>{err}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Actions */}
+            <div className="bg-slate-50 px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
+              <div className="flex items-center gap-2">
+                {importRows.some(r => !r.isValid) && (
+                  <button
+                    onClick={handleDownloadRejectedCSV}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-lg transition-all"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Download Rejected Log CSV</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setImportModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-200 hover:bg-slate-300 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={importRows.filter(r => r.isValid).length === 0}
+                  onClick={handleExecuteImport}
+                  className="px-5 py-2 text-xs font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg flex items-center gap-1.5 transition-all shadow-sm"
+                >
+                  <CheckCircle2 className="h-4 w-4 text-white" />
+                  <span>Confirm &amp; Import Valid Records ({importRows.filter(r => r.isValid).length})</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IMPORT EXECUTION SUMMARY MODAL */}
+      {importSummaryOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-primary-custom text-white px-6 py-4 flex items-center justify-between border-b">
+              <h3 className="font-extrabold text-sm tracking-wide uppercase">Bulk Import Completion</h3>
+              <button onClick={() => setImportSummaryOpen(false)} className="text-white/80 hover:text-white rounded-full p-1 hover:bg-white/10">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-center">
+              <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+
+              <h4 className="text-base font-extrabold text-slate-800">CSV Bulk Import Processed</h4>
+              <p className="text-xs text-slate-500">
+                The employee import process has finished executing against the Firestore database.
+              </p>
+
+              <div className="grid grid-cols-2 gap-3 py-2">
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase block">Successfully Imported</span>
+                  <span className="text-xl font-extrabold text-emerald-700">{importSuccessCount}</span>
+                </div>
+                <div className="p-3 bg-slate-100 border border-slate-200 rounded-lg">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Skipped / Failed</span>
+                  <span className="text-xl font-extrabold text-slate-700">{importFailCount}</span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-400 bg-slate-50 p-3 rounded-lg border text-left">
+                <strong>Audit Record:</strong> All created employee profiles have been registered in Employee Master and logged to Central Audit Log under current session user ({currentUser?.email}).
+              </p>
+            </div>
+
+            <div className="bg-slate-50 px-6 py-4 border-t flex justify-center">
+              <button
+                onClick={() => setImportSummaryOpen(false)}
+                className="px-6 py-2 text-xs font-bold text-white bg-primary-custom hover:opacity-90 rounded-lg shadow-sm"
+              >
+                Done
               </button>
             </div>
           </div>
