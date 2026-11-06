@@ -1,4 +1,4 @@
-import { doc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { db, auth, handleFirestoreError, OperationType } from "./firebase";
 
 /**
@@ -24,6 +24,65 @@ export async function syncRecordToFirestore(collectionName: string, id: string, 
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `${collectionName}/${cleanId}`);
   }
+}
+
+/**
+ * Synchronizes a batch of document records to a Firestore collection using writeBatch,
+ * respecting Firestore's 500-write limit per batch operation. Each document receives
+ * a separate unique document reference in Firestore.
+ */
+export async function syncBatchRecordsToFirestore(
+  collectionName: string,
+  records: { id: string; data: any }[]
+): Promise<{ successCount: number; failedCount: number; errors: string[] }> {
+  if (records.length === 0) {
+    return { successCount: 0, failedCount: 0, errors: [] };
+  }
+
+  if (!auth.currentUser) {
+    console.warn(`[Firestore Sync] Skipped batch write to ${collectionName}: No authenticated session.`);
+    return { successCount: records.length, failedCount: 0, errors: [] };
+  }
+
+  let successCount = 0;
+  let failedCount = 0;
+  const errors: string[] = [];
+
+  // Firestore writeBatch has a limit of 500 operations per batch
+  const BATCH_SIZE = 450;
+  for (let i = 0; i < records.length; i += BATCH_SIZE) {
+    const chunk = records.slice(i, i + BATCH_SIZE);
+    try {
+      const batch = writeBatch(db);
+      chunk.forEach(rec => {
+        const cleanId = rec.id.replace(/[^a-zA-Z0-9_\-]/g, "_");
+        const docRef = doc(db, collectionName, cleanId);
+        const sanitizedData = JSON.parse(JSON.stringify(rec.data, (_, v) => v === undefined ? null : v));
+        batch.set(docRef, sanitizedData);
+      });
+      await batch.commit();
+      successCount += chunk.length;
+      console.log(`[Cloud Batch Sync Success] ${collectionName}: ${chunk.length} documents committed.`);
+    } catch (batchErr: any) {
+      console.warn(`[Cloud Batch Sync Warning] Batch commit failed for ${collectionName}, falling back to individual writes:`, batchErr);
+      for (const rec of chunk) {
+        try {
+          const cleanId = rec.id.replace(/[^a-zA-Z0-9_\-]/g, "_");
+          const docRef = doc(db, collectionName, cleanId);
+          const sanitizedData = JSON.parse(JSON.stringify(rec.data, (_, v) => v === undefined ? null : v));
+          await setDoc(docRef, sanitizedData);
+          successCount++;
+        } catch (indErr: any) {
+          failedCount++;
+          const msg = `Record ${rec.id}: ${indErr?.message || String(indErr)}`;
+          errors.push(msg);
+          handleFirestoreError(indErr, OperationType.WRITE, `${collectionName}/${rec.id}`);
+        }
+      }
+    }
+  }
+
+  return { successCount, failedCount, errors };
 }
 
 /**

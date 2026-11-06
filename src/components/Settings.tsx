@@ -488,15 +488,22 @@ export default function Settings({
               />
             </div>
 
-            <div className="pt-4 border-t flex justify-end">
-              <button
-                type="submit"
-                className="px-4 py-2 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
-              >
-                <Save className="h-4 w-4 text-accent-custom" />
-                Save Profile
-              </button>
-            </div>
+            {currentUser?.role !== "Auditor" ? (
+              <div className="pt-4 border-t flex justify-end">
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
+                >
+                  <Save className="h-4 w-4 text-accent-custom" />
+                  Save Profile
+                </button>
+              </div>
+            ) : (
+              <div className="pt-4 border-t flex items-center gap-2 text-xs font-semibold text-amber-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-amber-600" />
+                <span>Read-Only Auditor Mode: Organization profile modifications are restricted.</span>
+              </div>
+            )}
           </form>
         )}
 
@@ -519,21 +526,23 @@ export default function Settings({
               </div>
               <div className="space-y-2 flex-1 text-center sm:text-left w-full">
                 <h4 className="font-bold text-xs text-slate-700">Ethio-Re Company Logo</h4>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <label className="px-3.5 py-1.5 bg-white border hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-lg cursor-pointer inline-block shadow-2xs">
-                    Choose New Logo
-                    <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
-                  </label>
-                  {logoUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setLogoUrl("")}
-                      className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold rounded-lg"
-                    >
-                      Remove Logo
-                    </button>
-                  )}
-                </div>
+                {currentUser?.role !== "Auditor" && (
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <label className="px-3.5 py-1.5 bg-white border hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-lg cursor-pointer inline-block shadow-2xs">
+                      Choose New Logo
+                      <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                    </label>
+                    {logoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setLogoUrl("")}
+                        className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold rounded-lg"
+                      >
+                        Remove Logo
+                      </button>
+                    )}
+                  </div>
+                )}
                 <p className="text-[10px] text-slate-400">Supported formats: JPEG, PNG, SVG (Max 1MB). Rendered on Sidebar, Top navigation, and Reports.</p>
               </div>
             </div>
@@ -550,13 +559,15 @@ export default function Settings({
                     type="color"
                     value={primaryColor}
                     onChange={(e) => setPrimaryColor(e.target.value)}
-                    className="h-9 w-12 border rounded-md cursor-pointer shrink-0"
+                    disabled={currentUser?.role === "Auditor"}
+                    className="h-9 w-12 border rounded-md cursor-pointer shrink-0 disabled:opacity-50"
                   />
                   <input
                     type="text"
                     value={primaryColor}
                     onChange={(e) => setPrimaryColor(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg text-xs font-mono font-bold"
+                    readOnly={currentUser?.role === "Auditor"}
+                    className="w-full px-3 py-2 border rounded-lg text-xs font-mono font-bold read-only:bg-slate-50"
                   />
                 </div>
                 <p className="text-[10px] text-slate-400">Primary brand color. Governs headers, primary buttons, and navigation blocks.</p>
@@ -572,13 +583,15 @@ export default function Settings({
                     type="color"
                     value={secondaryColor}
                     onChange={(e) => setSecondaryColor(e.target.value)}
-                    className="h-9 w-12 border rounded-md cursor-pointer shrink-0"
+                    disabled={currentUser?.role === "Auditor"}
+                    className="h-9 w-12 border rounded-md cursor-pointer shrink-0 disabled:opacity-50"
                   />
                   <input
                     type="text"
                     value={secondaryColor}
                     onChange={(e) => setSecondaryColor(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg text-xs font-mono font-bold"
+                    readOnly={currentUser?.role === "Auditor"}
+                    className="w-full px-3 py-2 border rounded-lg text-xs font-mono font-bold read-only:bg-slate-50"
                   />
                 </div>
                 <p className="text-[10px] text-slate-400">Supporting brand accent color. Applies on submenus and secondary details.</p>
@@ -594,35 +607,44 @@ export default function Settings({
                     type="color"
                     value={accentColor}
                     onChange={(e) => setAccentColor(e.target.value)}
-                    className="h-9 w-12 border rounded-md cursor-pointer shrink-0"
+                    disabled={currentUser?.role === "Auditor"}
+                    className="h-9 w-12 border rounded-md cursor-pointer shrink-0 disabled:opacity-50"
                   />
                   <input
                     type="text"
                     value={accentColor}
                     onChange={(e) => setAccentColor(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg text-xs font-mono font-bold"
+                    readOnly={currentUser?.role === "Auditor"}
+                    className="w-full px-3 py-2 border rounded-lg text-xs font-mono font-bold read-only:bg-slate-50"
                   />
                 </div>
                 <p className="text-[10px] text-slate-400">Highlights. Governs active tabs, alerts, and subtle brand lines.</p>
               </div>
             </div>
 
-            <div className="pt-4 border-t flex justify-between">
-              <button
-                type="button"
-                onClick={handleResetBranding}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-lg"
-              >
-                Reset Default Ethio-Re Colors
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
-              >
-                <Save className="h-4 w-4 text-accent-custom" />
-                Apply Branding
-              </button>
-            </div>
+            {currentUser?.role !== "Auditor" ? (
+              <div className="pt-4 border-t flex justify-between">
+                <button
+                  type="button"
+                  onClick={handleResetBranding}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-lg"
+                >
+                  Reset Default Ethio-Re Colors
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
+                >
+                  <Save className="h-4 w-4 text-accent-custom" />
+                  Apply Branding
+                </button>
+              </div>
+            ) : (
+              <div className="pt-4 border-t flex items-center gap-2 text-xs font-semibold text-amber-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-amber-600" />
+                <span>Read-Only Auditor Mode: Branding color palette and logo changes are restricted.</span>
+              </div>
+            )}
           </form>
         )}
 
@@ -635,36 +657,38 @@ export default function Settings({
             </div>
 
             {/* Add Holiday Inline Form */}
-            <form onSubmit={handleAddHoliday} className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-slate-50 rounded-lg border border-slate-100 items-end">
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">Holiday Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Adwa Victory Day"
-                  value={holidayName}
-                  onChange={(e) => setHolidayName(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-xs bg-white ring-primary-custom"
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">Holiday Date</label>
-                <input
-                  type="date"
-                  value={holidayDate}
-                  onChange={(e) => setHolidayDate(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-xs bg-white ring-primary-custom font-bold"
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full py-2 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1"
-              >
-                <Plus className="h-4 w-4" />
-                Add Date
-              </button>
-            </form>
+            {currentUser?.role !== "Auditor" && (
+              <form onSubmit={handleAddHoliday} className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-slate-50 rounded-lg border border-slate-100 items-end">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">Holiday Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Adwa Victory Day"
+                    value={holidayName}
+                    onChange={(e) => setHolidayName(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-xs bg-white ring-primary-custom"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">Holiday Date</label>
+                  <input
+                    type="date"
+                    value={holidayDate}
+                    onChange={(e) => setHolidayDate(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-xs bg-white ring-primary-custom font-bold"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full py-2 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Date
+                </button>
+              </form>
+            )}
 
             {/* Holidays List */}
             <div className="border rounded-lg overflow-hidden">
@@ -687,13 +711,17 @@ export default function Settings({
                         <td className="px-5 py-3 font-semibold text-slate-800">{h.name}</td>
                         <td className="px-5 py-3 font-bold text-primary-custom">{h.date}</td>
                         <td className="px-5 py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteHoliday(h.id, h.name)}
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {currentUser?.role !== "Auditor" ? (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteHoliday(h.id, h.name)}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">Read-Only</span>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -712,14 +740,16 @@ export default function Settings({
                 <h3 className="font-extrabold text-slate-800 text-base">User Directory &amp; Security</h3>
                 <p className="text-xs text-slate-500 mt-1">Manage personnel authorized to operate this portal (Admins and HR Officers).</p>
               </div>
-              <button
-                type="button"
-                onClick={handleOpenAddUser}
-                className="px-3 py-1.5 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg flex items-center gap-1 transition-all shadow-sm"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Add User</span>
-              </button>
+              {currentUser?.role !== "Auditor" && (
+                <button
+                  type="button"
+                  onClick={handleOpenAddUser}
+                  className="px-3 py-1.5 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg flex items-center gap-1 transition-all shadow-sm"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add User</span>
+                </button>
+              )}
             </div>
 
             {/* Users table */}
@@ -744,7 +774,9 @@ export default function Settings({
                       <td className="px-4 py-3.5 font-medium text-slate-500">{u.email}</td>
                       <td className="px-4 py-3.5">
                         <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                          u.role === "Administrator" ? "bg-primary-custom text-white" : "bg-slate-100 text-slate-700"
+                          u.role === "Administrator" ? "bg-primary-custom text-white" :
+                          u.role === "Auditor" ? "bg-amber-100 text-amber-800 border border-amber-200" :
+                          "bg-slate-100 text-slate-700"
                         }`}>
                           {u.role}
                         </span>
@@ -780,45 +812,49 @@ export default function Settings({
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditUser(u)}
-                          className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-50 rounded-md transition-colors inline-block"
-                          title="Edit Account Details"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        {!u.emailVerified && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              alert(`Simulated Action: A new verification link has been dispatched to ${u.email}`);
-                              onLogAction("Users", "Resend Verification", u.email, "Dispatched manual email verification link");
-                            }}
-                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors inline-block"
-                            title="Resend Verification Email"
-                          >
-                            <Mail className="h-4 w-4" />
-                          </button>
+                        {currentUser?.role !== "Auditor" && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditUser(u)}
+                              className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-50 rounded-md transition-colors inline-block"
+                              title="Edit Account Details"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            {!u.emailVerified && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  alert(`Simulated Action: A new verification link has been dispatched to ${u.email}`);
+                                  onLogAction("Users", "Resend Verification", u.email, "Dispatched manual email verification link");
+                                }}
+                                className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors inline-block"
+                                title="Resend Verification Email"
+                              >
+                                <Mail className="h-4 w-4" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleUserStatus(u)}
+                              className={`p-1 rounded-md transition-colors inline-block ${
+                                u.status === "Active" ? "text-slate-400 hover:text-rose-600 hover:bg-rose-50" : "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
+                              }`}
+                              title={u.status === "Active" ? "Deactivate User" : "Activate User"}
+                            >
+                              {u.status === "Active" ? <UserMinus className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUser(u)}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors inline-block"
+                              title="Delete Account"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleUserStatus(u)}
-                          className={`p-1 rounded-md transition-colors inline-block ${
-                            u.status === "Active" ? "text-slate-400 hover:text-rose-600 hover:bg-rose-50" : "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
-                          }`}
-                          title={u.status === "Active" ? "Deactivate User" : "Activate User"}
-                        >
-                          {u.status === "Active" ? <UserMinus className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteUser(u)}
-                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors inline-block"
-                          title="Delete Account"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
                       </td>
                     </tr>
                   ))}
@@ -833,7 +869,7 @@ export default function Settings({
           <div className="space-y-6">
             <div>
               <h3 className="font-extrabold text-slate-800 text-base">Role Authorization Matrix</h3>
-              <p className="text-xs text-slate-500 mt-1">This read-only grid summarizes system permissions mapped to the two authorized roles. This matrix is strictly hardcoded on the secure server.</p>
+              <p className="text-xs text-slate-500 mt-1">This read-only grid summarizes system permissions mapped to the authorized roles. This matrix is strictly enforced by application RBAC and Firestore security rules.</p>
             </div>
 
             <div className="border rounded-lg overflow-hidden">
@@ -843,20 +879,24 @@ export default function Settings({
                     <th className="px-5 py-3">Permission Node Module</th>
                     <th className="px-5 py-3 text-center bg-primary-custom/5 text-primary-custom font-extrabold">Administrator</th>
                     <th className="px-5 py-3 text-center">HR Officer</th>
+                    <th className="px-5 py-3 text-center bg-amber-50 text-amber-800 font-extrabold">Auditor</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {[
-                    { node: "Dashboard Statistics & KPI Summary", admin: "Full Access", hr: "Operational Only" },
-                    { node: "Employee Folder CRUD & Directory", admin: "Full Access", hr: "Full Access" },
-                    { node: "Department Setup CRUD", admin: "Full Access", hr: "Full Access (No Deletion of Active)" },
-                    { node: "Attendance Check-In Logs Correction", admin: "Full Access", hr: "Full Access (No approval pipeline)" },
-                    { node: "Leave Balance & Overlap Checking", admin: "Full Access", hr: "Full Access (Direct log - No approvals)" },
-                    { node: "Company Legal Profile Config", admin: "Full Access", hr: "No Access" },
-                    { node: "Branding CSS Themes & Logo Uploads", admin: "Full Access", hr: "No Access" },
-                    { node: "User Management (Account creation, reset)", admin: "Full Access", hr: "No Access" },
-                    { node: "Public Holidays Configuration", admin: "Full Access", hr: "No Access" },
-                    { node: "Secure Activity Audit Logs", admin: "Full Access", hr: "No Access" }
+                    { node: "Dashboard Statistics & KPI Summary", admin: "Full Access", hr: "Operational Only", auditor: "Read-Only Access" },
+                    { node: "Employee Folder CRUD & Directory", admin: "Full Access", hr: "Full Access", auditor: "Read-Only Access" },
+                    { node: "Department Setup CRUD", admin: "Full Access", hr: "Full Access (No Deletion)", auditor: "Read-Only Access" },
+                    { node: "Attendance Check-In Logs Correction", admin: "Full Access", hr: "Full Access", auditor: "Read-Only Access" },
+                    { node: "Leave Balance & Overlap Checking", admin: "Full Access", hr: "Full Access", auditor: "Read-Only Access" },
+                    { node: "Leave Configuration & Year-End Rules", admin: "Full Access", hr: "No Access", auditor: "Read-Only Access" },
+                    { node: "Medical Benefits & Policy Settings", admin: "Full Access", hr: "Full Access", auditor: "Read-Only Access" },
+                    { node: "Company Legal Profile Config", admin: "Full Access", hr: "No Access", auditor: "Read-Only Access" },
+                    { node: "Branding CSS Themes & Logo Uploads", admin: "Full Access", hr: "No Access", auditor: "Read-Only Access" },
+                    { node: "User Management (Account creation, reset)", admin: "Full Access", hr: "No Access", auditor: "Read-Only Access" },
+                    { node: "Public Holidays Configuration", admin: "Full Access", hr: "No Access", auditor: "Read-Only Access" },
+                    { node: "Secure Activity Audit Logs", admin: "Full Access", hr: "No Access", auditor: "Read-Only Access" },
+                    { node: "System Record Creation / Modification / Deletion / Approval", admin: "Full Access", hr: "Operational Writes", auditor: "Denied (Read-Only)" }
                   ].map((row, idx) => (
                     <tr key={idx} className="hover:bg-slate-50/50">
                       <td className="px-5 py-3.5 font-semibold text-slate-800">{row.node}</td>
@@ -865,6 +905,9 @@ export default function Settings({
                       </td>
                       <td className={`px-5 py-3.5 text-center font-bold ${row.hr === "No Access" ? "text-rose-500" : "text-emerald-600"}`}>
                         {row.hr}
+                      </td>
+                      <td className={`px-5 py-3.5 text-center bg-amber-50/60 font-bold ${row.auditor.startsWith("Denied") ? "text-rose-600" : "text-amber-800"}`}>
+                        {row.auditor}
                       </td>
                     </tr>
                   ))}
@@ -948,6 +991,7 @@ export default function Settings({
                   >
                     <option value="HR Officer">HR Officer</option>
                     <option value="Administrator">Administrator</option>
+                    <option value="Auditor">Auditor (Read-Only Org-Wide)</option>
                   </select>
                 </div>
                 <div className="space-y-1">

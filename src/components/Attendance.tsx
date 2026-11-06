@@ -274,14 +274,16 @@ export default function Attendance({
             <Printer className="h-4 w-4 text-slate-600" />
             <span>Print List</span>
           </button>
-          <button
-            onClick={handleOpenRecord}
-            className="flex-2 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-1.5 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg shadow-sm transition-all animate-pulse"
-            id="btn-record-attendance-trigger"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Record Attendance</span>
-          </button>
+          {currentUser?.role !== "Auditor" && (
+            <button
+              onClick={handleOpenRecord}
+              className="flex-2 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-1.5 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg shadow-sm transition-all animate-pulse"
+              id="btn-record-attendance-trigger"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Record Attendance</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -410,13 +412,15 @@ export default function Attendance({
                         {rec.remarks || "-"}
                       </td>
                       <td className="px-6 py-3.5 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => handleOpenEdit(rec)}
-                          className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-50 rounded-md transition-colors"
-                          title="Correct Entry"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
+                        {currentUser?.role !== "Auditor" && (
+                          <button
+                            onClick={() => handleOpenEdit(rec)}
+                            className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-50 rounded-md transition-colors"
+                            title="Correct Entry"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

@@ -228,14 +228,16 @@ export default function Departments({
           <h2 className="text-xl font-extrabold text-slate-800 tracking-tight">Department Management</h2>
           <p className="text-xs text-slate-500 mt-1">Configure physical &amp; operational organizational units.</p>
         </div>
-        <button
-          onClick={handleOpenAdd}
-          className="flex items-center justify-center gap-1.5 px-4 py-2 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg shadow-sm transition-all"
-          id="btn-add-department-trigger"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Add Department</span>
-        </button>
+        {currentUser?.role !== "Auditor" && (
+          <button
+            onClick={handleOpenAdd}
+            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg shadow-sm transition-all"
+            id="btn-add-department-trigger"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Department</span>
+          </button>
+        )}
       </div>
 
       {/* Search Input */}
@@ -311,22 +313,24 @@ export default function Departments({
                     <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">Enrolled Personnel</span>
                     <span className="font-extrabold text-slate-800 text-sm">{assignedCount} employees</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleOpenEdit(dept)}
-                      className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-slate-50 rounded-lg transition-colors"
-                      title="Edit details"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(dept)}
-                      className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                      title="Delete Department"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+                  {currentUser?.role !== "Auditor" && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleOpenEdit(dept)}
+                        className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-slate-50 rounded-lg transition-colors"
+                        title="Edit details"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(dept)}
+                        className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Delete Department"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );

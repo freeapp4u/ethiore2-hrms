@@ -508,54 +508,56 @@ export default function DocumentVault({
                     </button>
                   )}
 
-                  {/* Upload Trigger */}
-                  <label className="flex items-center gap-1 p-1.5 px-3 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-2xs">
-                    <Upload className="h-3.5 w-3.5" />
-                    <span>{isUploading ? "Uploading..." : "Upload File"}</span>
-                    <input
-                      type="file"
-                      className="hidden"
-                      onChange={handleFileUpload}
-                      disabled={isUploading}
-                    />
-                  </label>
+                  {currentUser?.role !== "Auditor" && (
+                    <>
+                      {/* Upload Trigger */}
+                      <label className="flex items-center gap-1 p-1.5 px-3 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-2xs">
+                        <Upload className="h-3.5 w-3.5" />
+                        <span>{isUploading ? "Uploading..." : "Upload File"}</span>
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={handleFileUpload}
+                          disabled={isUploading}
+                        />
+                      </label>
 
-                  {/* New Folder Modal Toggle */}
-                  <button
-                    onClick={() => {
-                      const name = window.prompt("Enter new folder name:");
-                      if (name && name.trim()) {
-                        setNewFolderName(name);
-                        setTimeout(() => {
-                          const mockForm = { preventDefault: () => {} };
-                          // Create folder immediately
-                          const url = "https://www.googleapis.com/drive/v3/files";
-                          const body = {
-                            name: name.trim(),
-                            mimeType: "application/vnd.google-apps.folder",
-                            parents: currentFolderId !== "root" ? [currentFolderId] : []
-                          };
-                          fetch(url, {
-                            method: "POST",
-                            headers: {
-                              Authorization: `Bearer ${accessToken}`,
-                              "Content-Type": "application/json"
-                            },
-                            body: JSON.stringify(body)
-                          }).then(res => {
-                            if (res.ok) {
-                              onLogAction("DocumentVault", "Create Folder", body.name, `Created Google Drive folder`);
-                              fetchDriveContents();
-                            }
-                          });
-                        }, 50);
-                      }
-                    }}
-                    className="p-1.5 bg-white hover:bg-slate-50 border rounded-lg text-slate-600"
-                    title="Create New Folder"
-                  >
-                    <FolderPlus className="h-4 w-4" />
-                  </button>
+                      {/* New Folder Modal Toggle */}
+                      <button
+                        onClick={() => {
+                          const name = window.prompt("Enter new folder name:");
+                          if (name && name.trim()) {
+                            setNewFolderName(name);
+                            setTimeout(() => {
+                              const url = "https://www.googleapis.com/drive/v3/files";
+                              const body = {
+                                name: name.trim(),
+                                mimeType: "application/vnd.google-apps.folder",
+                                parents: currentFolderId !== "root" ? [currentFolderId] : []
+                              };
+                              fetch(url, {
+                                method: "POST",
+                                headers: {
+                                  Authorization: `Bearer ${accessToken}`,
+                                  "Content-Type": "application/json"
+                                },
+                                body: JSON.stringify(body)
+                              }).then(res => {
+                                if (res.ok) {
+                                  onLogAction("DocumentVault", "Create Folder", body.name, `Created Google Drive folder`);
+                                  fetchDriveContents();
+                                }
+                              });
+                            }, 50);
+                          }
+                        }}
+                        className="p-1.5 bg-white hover:bg-slate-50 border rounded-lg text-slate-600"
+                        title="Create New Folder"
+                      >
+                        <FolderPlus className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
 
                   <button
                     onClick={fetchDriveContents}
@@ -640,23 +642,27 @@ export default function DocumentVault({
                             </a>
                           )}
 
-                          {!isFolder && (
-                            <button
-                              onClick={() => setAssociatingFile(file)}
-                              className="p-1 px-2 text-[10px] font-bold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded flex items-center gap-1 transition-all"
-                              title="Link file to Employee/Department"
-                            >
-                              <LinkIcon className="h-3 w-3" /> Link
-                            </button>
-                          )}
+                          {currentUser?.role !== "Auditor" && (
+                            <>
+                              {!isFolder && (
+                                <button
+                                  onClick={() => setAssociatingFile(file)}
+                                  className="p-1 px-2 text-[10px] font-bold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded flex items-center gap-1 transition-all"
+                                  title="Link file to Employee/Department"
+                                >
+                                  <LinkIcon className="h-3 w-3" /> Link
+                                </button>
+                              )}
 
-                          <button
-                            onClick={() => handleDeleteFile(file.id, file.name)}
-                            className="p-1 text-slate-400 hover:text-rose-600 bg-white border rounded hover:shadow-2xs transition-all"
-                            title="Delete permanently"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                              <button
+                                onClick={() => handleDeleteFile(file.id, file.name)}
+                                className="p-1 text-slate-400 hover:text-rose-600 bg-white border rounded hover:shadow-2xs transition-all"
+                                title="Delete permanently"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
@@ -763,13 +769,15 @@ export default function DocumentVault({
                           <span className="text-[10px] font-bold text-slate-700 truncate block max-w-[150px]" title={assoc.fileName}>
                             {assoc.fileName}
                           </span>
-                          <button
-                            onClick={() => handleRemoveAssociation(assoc.id, assoc.fileName)}
-                            className="text-slate-400 hover:text-rose-600"
-                            title="Remove link"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {currentUser?.role !== "Auditor" && (
+                            <button
+                              onClick={() => handleRemoveAssociation(assoc.id, assoc.fileName)}
+                              className="text-slate-400 hover:text-rose-600"
+                              title="Remove link"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
 
                         <div className="pt-1 border-t border-slate-100 flex items-center justify-between text-[10px]">

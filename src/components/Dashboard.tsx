@@ -1,6 +1,6 @@
-import { Employee, Department, AttendanceRecord, LeaveRecord, User, ActivityLog } from "../types";
+import { Employee, Department, AttendanceRecord, LeaveRecord, User, ActivityLog, UserRole } from "../types";
 import { 
-  Users, Landmark, UserCheck, UserX, CalendarDays, Plus, Clock, FileSpreadsheet, KeyRound, CheckCircle2, AlertTriangle
+  Users, Landmark, UserCheck, UserX, CalendarDays, Plus, Clock, FileSpreadsheet, KeyRound, CheckCircle2, AlertTriangle, ShieldCheck
 } from "lucide-react";
 
 interface DashboardProps {
@@ -10,7 +10,7 @@ interface DashboardProps {
   leaves: LeaveRecord[];
   users: User[];
   logs: ActivityLog[];
-  role: "Administrator" | "HR Officer";
+  role: UserRole;
   onNavigate: (tabId: string) => void;
   onOpenQuickAddEmployee: () => void;
   onOpenQuickRecordAttendance: () => void;
@@ -58,7 +58,7 @@ export default function Dashboard({
     .sort((a, b) => b.createdDate.localeCompare(a.createdDate))
     .slice(0, 5);
 
-  // Recent system logs (Admin only)
+  // Recent system logs (Admin & Auditor)
   const recentLogs = [...logs]
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
     .slice(0, 5);
@@ -73,8 +73,16 @@ export default function Dashboard({
             Human Resource Management &amp; Analytics Console • Active Date: <span className="font-bold text-slate-700">{todayStr}</span>
           </p>
         </div>
-        <div className="text-xs bg-slate-100 border px-3 py-1.5 rounded-lg text-slate-600 font-semibold">
-          Signed in: <span className="text-primary-custom capitalize font-bold">{role}</span>
+        <div className="flex items-center gap-2">
+          {role === "Auditor" && (
+            <span className="bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-[10px] uppercase px-2.5 py-1 rounded-full flex items-center gap-1">
+              <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />
+              <span>Read-Only Auditor</span>
+            </span>
+          )}
+          <div className="text-xs bg-slate-100 border px-3 py-1.5 rounded-lg text-slate-600 font-semibold">
+            Signed in: <span className="text-primary-custom capitalize font-bold">{role}</span>
+          </div>
         </div>
       </div>
 
@@ -131,15 +139,15 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* Admin Extra Metrics Panel */}
-      {role === "Administrator" && (
+      {/* Admin / Auditor Extra Metrics Panel */}
+      {(role === "Administrator" || role === "Auditor") && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 border border-slate-200 rounded-lg p-4">
           <div className="flex items-center gap-3">
             <KeyRound className="h-5 w-5 text-primary-custom" />
             <div>
               <p className="text-xs font-bold text-slate-700">Total System Users</p>
               <p className="text-sm font-semibold text-slate-500">
-                <span className="text-lg font-black text-slate-800">{users.length}</span> registered administrators &amp; HR officers
+                <span className="text-lg font-black text-slate-800">{users.length}</span> registered operators &amp; auditors
               </p>
             </div>
           </div>
@@ -157,42 +165,60 @@ export default function Dashboard({
 
       {/* Quick Actions Panel */}
       <div>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Quick HR Actions</p>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+          {role === "Auditor" ? "Audit Navigation Shortcuts" : "Quick HR Actions"}
+        </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <button 
-            onClick={onOpenQuickAddEmployee}
-            className="flex flex-col items-center justify-center p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-center transition-all group"
-            id="qa-add-employee"
-          >
-            <div className="h-8 w-8 rounded-full bg-slate-100 group-hover:bg-primary-custom group-hover:text-white text-primary-custom flex items-center justify-center mb-2 transition-all">
-              <Plus className="h-4 w-4" />
-            </div>
-            <span className="text-xs font-bold text-slate-700">Add Employee</span>
-            <span className="text-[10px] text-slate-400 mt-0.5">Enroll new resource</span>
-          </button>
+          {role !== "Auditor" && (
+            <>
+              <button 
+                onClick={onOpenQuickAddEmployee}
+                className="flex flex-col items-center justify-center p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-center transition-all group"
+                id="qa-add-employee"
+              >
+                <div className="h-8 w-8 rounded-full bg-slate-100 group-hover:bg-primary-custom group-hover:text-white text-primary-custom flex items-center justify-center mb-2 transition-all">
+                  <Plus className="h-4 w-4" />
+                </div>
+                <span className="text-xs font-bold text-slate-700">Add Employee</span>
+                <span className="text-[10px] text-slate-400 mt-0.5">Enroll new resource</span>
+              </button>
+
+              <button 
+                onClick={onOpenQuickRecordAttendance}
+                className="flex flex-col items-center justify-center p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-center transition-all group"
+                id="qa-record-attendance"
+              >
+                <div className="h-8 w-8 rounded-full bg-slate-100 group-hover:bg-primary-custom group-hover:text-white text-primary-custom flex items-center justify-center mb-2 transition-all">
+                  <Clock className="h-4 w-4" />
+                </div>
+                <span className="text-xs font-bold text-slate-700">Record Attendance</span>
+                <span className="text-[10px] text-slate-400 mt-0.5">Log daily attendance</span>
+              </button>
+
+              <button 
+                onClick={onOpenQuickRegisterLeave}
+                className="flex flex-col items-center justify-center p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-center transition-all group"
+                id="qa-register-leave"
+              >
+                <div className="h-8 w-8 rounded-full bg-slate-100 group-hover:bg-primary-custom group-hover:text-white text-primary-custom flex items-center justify-center mb-2 transition-all">
+                  <CalendarDays className="h-4 w-4" />
+                </div>
+                <span className="text-xs font-bold text-slate-700">Register Leave</span>
+                <span className="text-[10px] text-slate-400 mt-0.5">Book leave directly</span>
+              </button>
+            </>
+          )}
 
           <button 
-            onClick={onOpenQuickRecordAttendance}
+            onClick={() => onNavigate("employees")}
             className="flex flex-col items-center justify-center p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-center transition-all group"
-            id="qa-record-attendance"
+            id="qa-view-employees"
           >
             <div className="h-8 w-8 rounded-full bg-slate-100 group-hover:bg-primary-custom group-hover:text-white text-primary-custom flex items-center justify-center mb-2 transition-all">
-              <Clock className="h-4 w-4" />
+              <Users className="h-4 w-4" />
             </div>
-            <span className="text-xs font-bold text-slate-700">Record Attendance</span>
-            <span className="text-[10px] text-slate-400 mt-0.5">Log daily attendance</span>
-          </button>
-
-          <button 
-            onClick={onOpenQuickRegisterLeave}
-            className="flex flex-col items-center justify-center p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-center transition-all group"
-            id="qa-register-leave"
-          >
-            <div className="h-8 w-8 rounded-full bg-slate-100 group-hover:bg-primary-custom group-hover:text-white text-primary-custom flex items-center justify-center mb-2 transition-all">
-              <CalendarDays className="h-4 w-4" />
-            </div>
-            <span className="text-xs font-bold text-slate-700">Register Leave</span>
-            <span className="text-[10px] text-slate-400 mt-0.5">Book leave directly</span>
+            <span className="text-xs font-bold text-slate-700">Employee Directory</span>
+            <span className="text-[10px] text-slate-400 mt-0.5">Audit personnel folders</span>
           </button>
 
           <button 
@@ -209,8 +235,8 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* Lists Section: Attendance vs. Leaves (vs. Activity Logs if Admin) */}
-      <div className={`grid grid-cols-1 ${role === "Administrator" ? "lg:grid-cols-3" : "lg:grid-cols-2"} gap-6`}>
+      {/* Lists Section: Attendance vs. Leaves (vs. Activity Logs if Admin/Auditor) */}
+      <div className={`grid grid-cols-1 ${(role === "Administrator" || role === "Auditor") ? "lg:grid-cols-3" : "lg:grid-cols-2"} gap-6`}>
         {/* Recent Attendance */}
         <div className="bg-white rounded-lg border border-slate-200 overflow-hidden flex flex-col h-[380px]">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
@@ -309,8 +335,8 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* Recent Admin Logs - Admin Only */}
-        {role === "Administrator" && (
+        {/* Recent Admin Logs - Admin & Auditor */}
+        {(role === "Administrator" || role === "Auditor") && (
           <div className="bg-white rounded-lg border border-slate-200 overflow-hidden flex flex-col h-[380px]">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <h3 className="font-bold text-xs text-slate-800 uppercase tracking-wider flex items-center gap-2">

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   loadState, saveState, logActivity, AppState 
 } from "./dbStore";
-import { syncRecordToFirestore, deleteRecordFromFirestore } from "./firebaseSync";
+import { syncRecordToFirestore, deleteRecordFromFirestore, syncBatchRecordsToFirestore } from "./firebaseSync";
 import { 
   auth, 
   signInWithEmailAndPassword, 
@@ -396,9 +396,65 @@ export default function App() {
   const handleAddEmployee = (emp: Employee): boolean => {
     const exists = employees.some(e => e.employeeId.toLowerCase() === emp.employeeId.toLowerCase());
     if (exists) return false;
-    handleUpdateEmployees([...employees, emp]);
+    const updated = [...employees, emp];
+    handleUpdateEmployees(updated);
     syncRecordToFirestore("employees", emp.employeeId, emp);
     return true;
+  };
+
+  const handleAddEmployeesBulk = async (
+    newEmps: Employee[]
+  ): Promise<{ successCount: number; failCount: number; failedErrors: string[] }> => {
+    if (newEmps.length === 0) {
+      return { successCount: 0, failCount: 0, failedErrors: [] };
+    }
+
+    // Filter out duplicate IDs against current employees list
+    const existingIds = new Set(employees.map(e => e.employeeId.toUpperCase()));
+    const validToInsert: Employee[] = [];
+    const duplicateErrors: string[] = [];
+
+    newEmps.forEach(emp => {
+      const upperId = emp.employeeId.toUpperCase();
+      if (existingIds.has(upperId)) {
+        duplicateErrors.push(`Employee ID '${emp.employeeId}' already exists in system.`);
+      } else {
+        existingIds.add(upperId);
+        validToInsert.push(emp);
+      }
+    });
+
+    if (validToInsert.length === 0) {
+      return {
+        successCount: 0,
+        failCount: newEmps.length,
+        failedErrors: duplicateErrors
+      };
+    }
+
+    // Prepare separate document references for Firestore batch write
+    const batchRecords = validToInsert.map(emp => ({
+      id: emp.employeeId,
+      data: emp
+    }));
+
+    // Await batch write to Firestore
+    const syncResult = await syncBatchRecordsToFirestore("employees", batchRecords);
+
+    // Update React State in a SINGLE update preserving ALL imported employees + existing employees
+    setEmployees(prevEmployees => {
+      const currentIds = new Set(prevEmployees.map(e => e.employeeId.toUpperCase()));
+      const trulyNew = validToInsert.filter(e => !currentIds.has(e.employeeId.toUpperCase()));
+      const combined = [...prevEmployees, ...trulyNew];
+      saveState({ employees: combined });
+      return combined;
+    });
+
+    return {
+      successCount: syncResult.successCount,
+      failCount: syncResult.failedCount + duplicateErrors.length,
+      failedErrors: [...duplicateErrors, ...syncResult.errors]
+    };
   };
   const handleUpdateEmployee = (emp: Employee) => {
     const updated = employees.map(e => e.employeeId === emp.employeeId ? emp : e);
@@ -846,6 +902,7 @@ export default function App() {
               familyMembers={familyMembers}
               currentUser={currentUser}
               onAddEmployee={handleAddEmployee}
+              onAddEmployeesBulk={handleAddEmployeesBulk}
               onUpdateEmployee={handleUpdateEmployee}
               onAddFamilyMember={handleAddFamilyMember}
               onLogAction={handleLogAction}

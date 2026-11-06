@@ -8,7 +8,7 @@ import {
   Plus, Search, Edit, Trash2, Calendar, CalendarDays, Check, X, Save, 
   FileSpreadsheet, Printer, RefreshCw, Calculator, Ban, Info, AlertTriangle,
   LayoutDashboard, FileText, CheckCircle2, ShieldAlert, Clock, ArrowRight,
-  Sliders, Settings, ChevronRight, Download, Filter, UserCheck, Layers, Award
+  Sliders, Settings, ChevronRight, Download, Filter, UserCheck, Layers, Award, ShieldCheck
 } from "lucide-react";
 
 interface LeaveManagementProps {
@@ -791,6 +791,12 @@ export default function LeaveManagement({
         </div>
 
         <div className="flex items-center gap-2">
+          {currentUser?.role === "Auditor" && (
+            <span className="bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-[10px] uppercase px-2.5 py-1 rounded-full flex items-center gap-1">
+              <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />
+              <span>Read-Only Auditor Mode</span>
+            </span>
+          )}
           {currentUser?.role === "Administrator" && (
             <button
               onClick={() => {
@@ -803,13 +809,15 @@ export default function LeaveManagement({
               <span>Year-End Processing</span>
             </button>
           )}
-          <button
-            onClick={handleOpenAdd}
-            className="px-3.5 py-1.5 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-2xs"
-          >
-            <Plus className="h-3.5 w-3.5 text-accent-custom" />
-            <span>Book Leave Application</span>
-          </button>
+          {currentUser?.role !== "Auditor" && (
+            <button
+              onClick={handleOpenAdd}
+              className="px-3.5 py-1.5 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-2xs"
+            >
+              <Plus className="h-3.5 w-3.5 text-accent-custom" />
+              <span>Book Leave Application</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -823,7 +831,7 @@ export default function LeaveManagement({
           { id: "config", label: "5. Leave Configuration", icon: Settings, adminOnly: true },
           { id: "reports", label: "6. Leave Reports", icon: FileSpreadsheet }
         ].map(tab => {
-          if (tab.adminOnly && currentUser?.role !== "Administrator") return null;
+          if (tab.adminOnly && currentUser?.role !== "Administrator" && currentUser?.role !== "Auditor") return null;
           const IconComp = tab.icon;
           const isActive = activeSubTab === tab.id;
           return (
@@ -1033,12 +1041,14 @@ export default function LeaveManagement({
             </div>
 
             <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-              <button
-                onClick={handleOpenAdd}
-                className="px-3 py-1.5 bg-primary-custom text-white text-xs font-bold rounded-lg hover:opacity-95 flex items-center gap-1 transition-all"
-              >
-                <Plus className="h-3.5 w-3.5 text-accent-custom" /> Book Leave
-              </button>
+              {currentUser?.role !== "Auditor" && (
+                <button
+                  onClick={handleOpenAdd}
+                  className="px-3 py-1.5 bg-primary-custom text-white text-xs font-bold rounded-lg hover:opacity-95 flex items-center gap-1 transition-all"
+                >
+                  <Plus className="h-3.5 w-3.5 text-accent-custom" /> Book Leave
+                </button>
+              )}
             </div>
           </div>
 
@@ -1111,21 +1121,27 @@ export default function LeaveManagement({
                             {l.reason || "-"}
                           </td>
                           <td className="px-5 py-3 text-right space-x-1 whitespace-nowrap">
-                            <button
-                              onClick={() => handleOpenEdit(l)}
-                              className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded"
-                              title="Edit Application"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </button>
-                            {l.status !== "Cancelled" && (
-                              <button
-                                onClick={() => handleCancelLeave(l)}
-                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded"
-                                title="Cancel Application"
-                              >
-                                <Ban className="h-3.5 w-3.5" />
-                              </button>
+                            {currentUser?.role !== "Auditor" ? (
+                              <>
+                                <button
+                                  onClick={() => handleOpenEdit(l)}
+                                  className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded"
+                                  title="Edit Application"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </button>
+                                {l.status !== "Cancelled" && (
+                                  <button
+                                    onClick={() => handleCancelLeave(l)}
+                                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded"
+                                    title="Cancel Application"
+                                  >
+                                    <Ban className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">Read-Only</span>
                             )}
                           </td>
                         </tr>
@@ -1362,12 +1378,14 @@ export default function LeaveManagement({
                   Configure accruals, carry-forward caps, paid status, and documentation requirements.
                 </p>
               </div>
-              <button
-                onClick={() => handleOpenTypeModal()}
-                className="px-3 py-1.5 bg-primary-custom text-white text-xs font-bold rounded-lg hover:opacity-95 flex items-center gap-1"
-              >
-                <Plus className="h-3.5 w-3.5 text-accent-custom" /> Create Leave Type
-              </button>
+              {currentUser?.role !== "Auditor" && (
+                <button
+                  onClick={() => handleOpenTypeModal()}
+                  className="px-3 py-1.5 bg-primary-custom text-white text-xs font-bold rounded-lg hover:opacity-95 flex items-center gap-1"
+                >
+                  <Plus className="h-3.5 w-3.5 text-accent-custom" /> Create Leave Type
+                </button>
+              )}
             </div>
 
             <div className="overflow-x-auto">
@@ -1411,12 +1429,16 @@ export default function LeaveManagement({
                         </span>
                       </td>
                       <td className="p-3 text-right">
-                        <button
-                          onClick={() => handleOpenTypeModal(lt)}
-                          className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded"
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                        </button>
+                        {currentUser?.role !== "Auditor" ? (
+                          <button
+                            onClick={() => handleOpenTypeModal(lt)}
+                            className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">Read-Only</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1437,7 +1459,8 @@ export default function LeaveManagement({
                   type="text"
                   value={lyYearName}
                   onChange={(e) => setLyYearName(e.target.value)}
-                  className="w-full px-3 py-1.5 border rounded-lg text-xs font-bold"
+                  readOnly={currentUser?.role === "Auditor"}
+                  className="w-full px-3 py-1.5 border rounded-lg text-xs font-bold read-only:bg-slate-50"
                   required
                 />
               </div>
@@ -1447,7 +1470,8 @@ export default function LeaveManagement({
                   type="date"
                   value={lyStart}
                   onChange={(e) => setLyStart(e.target.value)}
-                  className="w-full px-3 py-1.5 border rounded-lg text-xs font-bold"
+                  readOnly={currentUser?.role === "Auditor"}
+                  className="w-full px-3 py-1.5 border rounded-lg text-xs font-bold read-only:bg-slate-50"
                   required
                 />
               </div>
@@ -1457,7 +1481,8 @@ export default function LeaveManagement({
                   type="date"
                   value={lyEnd}
                   onChange={(e) => setLyEnd(e.target.value)}
-                  className="w-full px-3 py-1.5 border rounded-lg text-xs font-bold"
+                  readOnly={currentUser?.role === "Auditor"}
+                  className="w-full px-3 py-1.5 border rounded-lg text-xs font-bold read-only:bg-slate-50"
                   required
                 />
               </div>
@@ -1470,6 +1495,7 @@ export default function LeaveManagement({
                       <input
                         type="checkbox"
                         checked={lyWorkingDays.includes(day)}
+                        disabled={currentUser?.role === "Auditor"}
                         onChange={(e) => {
                           if (e.target.checked) {
                             setLyWorkingDays([...lyWorkingDays, day]);
@@ -1485,12 +1511,19 @@ export default function LeaveManagement({
               </div>
 
               <div className="md:col-span-3 flex justify-end">
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-primary-custom text-white font-bold text-xs rounded-lg hover:opacity-95 flex items-center gap-1"
-                >
-                  <Save className="h-4 w-4 text-accent-custom" /> Save Schedule Policy
-                </button>
+                {currentUser?.role !== "Auditor" ? (
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-primary-custom text-white font-bold text-xs rounded-lg hover:opacity-95 flex items-center gap-1"
+                  >
+                    <Save className="h-4 w-4 text-accent-custom" /> Save Schedule Policy
+                  </button>
+                ) : (
+                  <div className="w-full flex items-center gap-2 text-xs font-semibold text-amber-800 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                    <ShieldCheck className="h-4 w-4 shrink-0 text-amber-600" />
+                    <span>Read-Only Auditor Mode: Schedule rules and working days are locked.</span>
+                  </div>
+                )}
               </div>
             </form>
           </div>

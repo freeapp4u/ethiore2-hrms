@@ -1,4 +1,4 @@
-export type UserRole = "Administrator" | "HR Officer";
+export type UserRole = "Administrator" | "HR Officer" | "Auditor";
 export type AccountStatus = "Active" | "Inactive" | "Suspended" | "Pending Verification";
 export type EmploymentStatus = "Active" | "Inactive";
 export type AttendanceStatus = "Present" | "Absent" | "Late" | "On Leave" | "Half Day" | "Other";

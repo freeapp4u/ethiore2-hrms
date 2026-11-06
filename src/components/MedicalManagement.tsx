@@ -499,20 +499,30 @@ export default function MedicalManagement({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleOpenFamAdd()}
-            className="px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-2xs"
-          >
-            <UserPlus className="h-3.5 w-3.5 text-sky-600" />
-            <span>Add Family Member</span>
-          </button>
-          <button
-            onClick={() => handleOpenClaimAdd()}
-            className="px-3.5 py-1.5 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-2xs"
-          >
-            <Plus className="h-3.5 w-3.5 text-accent-custom" />
-            <span>Record Expense Claim</span>
-          </button>
+          {currentUser?.role === "Auditor" && (
+            <span className="bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-[10px] uppercase px-2.5 py-1 rounded-full flex items-center gap-1">
+              <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />
+              <span>Read-Only Auditor Mode</span>
+            </span>
+          )}
+          {currentUser?.role !== "Auditor" && (
+            <>
+              <button
+                onClick={() => handleOpenFamAdd()}
+                className="px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-2xs"
+              >
+                <UserPlus className="h-3.5 w-3.5 text-sky-600" />
+                <span>Add Family Member</span>
+              </button>
+              <button
+                onClick={() => handleOpenClaimAdd()}
+                className="px-3.5 py-1.5 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-2xs"
+              >
+                <Plus className="h-3.5 w-3.5 text-accent-custom" />
+                <span>Record Expense Claim</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -525,7 +535,7 @@ export default function MedicalManagement({
           { id: "policy", label: "4. Policy Settings", icon: Settings, adminOnly: true },
           { id: "reports", label: "5. Medical Reports", icon: FileSpreadsheet }
         ].map(tab => {
-          if (tab.adminOnly && currentUser?.role !== "Administrator") return null;
+          if (tab.adminOnly && currentUser?.role !== "Administrator" && currentUser?.role !== "Auditor") return null;
           const IconComp = tab.icon;
           const isActive = activeSubTab === tab.id;
           return (
@@ -830,20 +840,26 @@ export default function MedicalManagement({
                           )}
                         </td>
                         <td className="px-4 py-3 text-right space-x-1 whitespace-nowrap">
-                          <button
-                            onClick={() => handleOpenClaimEdit(m)}
-                            className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded"
-                            title="Edit Claim"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClaim(m)}
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded"
-                            title="Delete Claim"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {currentUser?.role !== "Auditor" ? (
+                            <>
+                              <button
+                                onClick={() => handleOpenClaimEdit(m)}
+                                className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded"
+                                title="Edit Claim"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteClaim(m)}
+                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded"
+                                title="Delete Claim"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">Read-Only</span>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -992,20 +1008,26 @@ export default function MedicalManagement({
                             {famExpenses.toLocaleString()} ETB
                           </td>
                           <td className="px-4 py-3 text-right space-x-1 whitespace-nowrap">
-                            <button
-                              onClick={() => handleOpenFamEdit(f)}
-                              className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded"
-                              title="Edit Details"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleToggleFamStatus(f)}
-                              className={`p-1 rounded ${f.status === "Active" ? "text-slate-400 hover:text-rose-600 hover:bg-rose-50" : "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"}`}
-                              title={f.status === "Active" ? "Deactivate" : "Activate"}
-                            >
-                              <ShieldAlert className="h-3.5 w-3.5" />
-                            </button>
+                            {currentUser?.role !== "Auditor" ? (
+                              <>
+                                <button
+                                  onClick={() => handleOpenFamEdit(f)}
+                                  className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded"
+                                  title="Edit Details"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleToggleFamStatus(f)}
+                                  className={`p-1 rounded ${f.status === "Active" ? "text-slate-400 hover:text-rose-600 hover:bg-rose-50" : "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"}`}
+                                  title={f.status === "Active" ? "Deactivate" : "Activate"}
+                                >
+                                  <ShieldAlert className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">Read-Only</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1019,9 +1041,9 @@ export default function MedicalManagement({
       )}
 
       {/* ========================================== */}
-      {/* SUBMENU 4: POLICY CONFIGURATION (Admin) */}
+      {/* SUBMENU 4: POLICY CONFIGURATION (Admin & Auditor) */}
       {/* ========================================== */}
-      {activeSubTab === "policy" && currentUser?.role === "Administrator" && (
+      {activeSubTab === "policy" && (currentUser?.role === "Administrator" || currentUser?.role === "Auditor") && (
         <div className="space-y-6 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-5 space-y-4 max-w-2xl">
             <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2 border-b pb-3">
@@ -1037,7 +1059,8 @@ export default function MedicalManagement({
                   type="number"
                   value={polDefaultAlloc}
                   onChange={(e) => setPolDefaultAlloc(Number(e.target.value))}
-                  className="w-full px-3 py-2 border rounded-lg text-xs font-bold ring-primary-custom"
+                  readOnly={currentUser?.role === "Auditor"}
+                  className="w-full px-3 py-2 border rounded-lg text-xs font-bold ring-primary-custom read-only:bg-slate-50"
                   required
                 />
                 <span className="text-[10px] text-slate-400 block font-medium">
@@ -1060,6 +1083,7 @@ export default function MedicalManagement({
                   <input
                     type="checkbox"
                     checked={polReqInvoice}
+                    disabled={currentUser?.role === "Auditor"}
                     onChange={(e) => setPolReqInvoice(e.target.checked)}
                   />
                   <span>Enforce Mandatory Invoice / Receipt Number for All Claims</span>
@@ -1067,12 +1091,19 @@ export default function MedicalManagement({
               </div>
 
               <div className="flex justify-end pt-3 border-t">
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-primary-custom text-white font-bold text-xs rounded-lg hover:opacity-95 flex items-center gap-1.5"
-                >
-                  <Save className="h-4 w-4 text-accent-custom" /> Save Policy Configuration
-                </button>
+                {currentUser?.role !== "Auditor" ? (
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-primary-custom text-white font-bold text-xs rounded-lg hover:opacity-95 flex items-center gap-1.5"
+                  >
+                    <Save className="h-4 w-4 text-accent-custom" /> Save Policy Configuration
+                  </button>
+                ) : (
+                  <div className="w-full flex items-center gap-2 text-xs font-semibold text-amber-800 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                    <ShieldCheck className="h-4 w-4 shrink-0 text-amber-600" />
+                    <span>Read-Only Auditor Mode: Benefit policy settings are locked.</span>
+                  </div>
+                )}
               </div>
             </form>
           </div>

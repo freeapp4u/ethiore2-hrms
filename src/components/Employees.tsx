@@ -46,6 +46,7 @@ interface EmployeesProps {
   familyMembers?: FamilyMember[];
   currentUser: User | null;
   onAddEmployee: (emp: Employee) => boolean;
+  onAddEmployeesBulk?: (emps: Employee[]) => Promise<{ successCount: number; failCount: number; failedErrors: string[] }>;
   onUpdateEmployee: (emp: Employee) => void;
   onAddFamilyMember?: (fm: FamilyMember) => boolean;
   onLogAction: (module: string, action: string, record: string, details: string) => void;
@@ -57,6 +58,7 @@ export default function Employees({
   familyMembers = [],
   currentUser,
   onAddEmployee,
+  onAddEmployeesBulk,
   onUpdateEmployee,
   onAddFamilyMember,
   onLogAction
@@ -76,6 +78,7 @@ export default function Employees({
   const [importSuccessCount, setImportSuccessCount] = useState(0);
   const [importFailCount, setImportFailCount] = useState(0);
   const [importDuplicateCount, setImportDuplicateCount] = useState(0);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
 
   // Dialog States
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -550,26 +553,37 @@ export default function Employees({
   };
 
   // Execute Bulk Import for Valid Records
-  const handleExecuteImport = () => {
+  const handleExecuteImport = async () => {
     const validRows = importRows.filter(r => r.isValid && r.employeeObj);
     if (validRows.length === 0) {
       alert("No valid employee records to import.");
       return;
     }
 
+    setIsProcessingImport(true);
+
+    const validEmps = validRows.map(r => r.employeeObj!).filter(Boolean);
+
     let success = 0;
     let fail = 0;
+    let errorsList: string[] = [];
 
-    validRows.forEach(r => {
-      if (r.employeeObj) {
-        const ok = onAddEmployee(r.employeeObj);
+    if (onAddEmployeesBulk) {
+      const result = await onAddEmployeesBulk(validEmps);
+      success = result.successCount;
+      fail = result.failCount + (importRows.length - validRows.length);
+      errorsList = result.failedErrors;
+    } else {
+      for (const emp of validEmps) {
+        const ok = onAddEmployee(emp);
         if (ok) {
           success++;
         } else {
           fail++;
         }
       }
-    });
+      fail += (importRows.length - validRows.length);
+    }
 
     onLogAction(
       "Employee",
@@ -579,7 +593,9 @@ export default function Employees({
     );
 
     setImportSuccessCount(success);
-    setImportFailCount(fail + (importRows.length - validRows.length));
+    setImportFailCount(fail);
+    setImportErrors(errorsList);
+    setIsProcessingImport(false);
     setImportModalOpen(false);
     setImportSummaryOpen(true);
   };
@@ -615,18 +631,20 @@ export default function Employees({
           <p className="text-xs text-slate-500 mt-1">Manage, search, and register operational personnel folders.</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => {
-              setImportRows([]);
-              setSelectedFileName("");
-              setImportModalOpen(true);
-            }}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all"
-            id="btn-import-employees-trigger"
-          >
-            <Upload className="h-4 w-4" />
-            <span>Import CSV</span>
-          </button>
+          {currentUser?.role !== "Auditor" && (
+            <button
+              onClick={() => {
+                setImportRows([]);
+                setSelectedFileName("");
+                setImportModalOpen(true);
+              }}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all"
+              id="btn-import-employees-trigger"
+            >
+              <Upload className="h-4 w-4" />
+              <span>Import CSV</span>
+            </button>
+          )}
           <button
             onClick={handleExportCSV}
             className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg transition-all"
@@ -643,14 +661,16 @@ export default function Employees({
             <Printer className="h-4 w-4 text-slate-600" />
             <span>Print List</span>
           </button>
-          <button
-            onClick={handleOpenAdd}
-            className="flex-2 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-1.5 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg shadow-sm transition-all"
-            id="btn-add-employee-trigger"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Employee</span>
-          </button>
+          {currentUser?.role !== "Auditor" && (
+            <button
+              onClick={handleOpenAdd}
+              className="flex-2 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-1.5 bg-primary-custom hover:opacity-95 text-white text-xs font-bold rounded-lg shadow-sm transition-all"
+              id="btn-add-employee-trigger"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Employee</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -770,24 +790,28 @@ export default function Employees({
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => handleOpenEdit(emp)}
-                          className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded-md transition-colors inline-block"
-                          title="Edit Folder"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleToggleStatus(emp)}
-                          className={`p-1 rounded-md transition-colors inline-block ${
-                            emp.status === "Active" 
-                              ? "text-slate-400 hover:text-rose-600 hover:bg-rose-50" 
-                              : "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
-                          }`}
-                          title={emp.status === "Active" ? "Deactivate Employee" : "Reactivate Employee"}
-                        >
-                          {emp.status === "Active" ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                        </button>
+                        {currentUser?.role !== "Auditor" && (
+                          <>
+                            <button
+                              onClick={() => handleOpenEdit(emp)}
+                              className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded-md transition-colors inline-block"
+                              title="Edit Folder"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleToggleStatus(emp)}
+                              className={`p-1 rounded-md transition-colors inline-block ${
+                                emp.status === "Active" 
+                                  ? "text-slate-400 hover:text-rose-600 hover:bg-rose-50" 
+                                  : "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
+                              }`}
+                              title={emp.status === "Active" ? "Deactivate Employee" : "Reactivate Employee"}
+                            >
+                              {emp.status === "Active" ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   );
@@ -1689,6 +1713,17 @@ export default function Employees({
                   <span className="text-xl font-extrabold text-slate-700">{importFailCount}</span>
                 </div>
               </div>
+
+              {importErrors.length > 0 && (
+                <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-left space-y-1 max-h-36 overflow-y-auto">
+                  <span className="text-[11px] font-bold text-rose-800 uppercase block">Failed / Skipped Record Errors:</span>
+                  <ul className="text-[11px] text-rose-700 space-y-0.5 list-disc pl-4">
+                    {importErrors.map((err, idx) => (
+                      <li key={idx}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <p className="text-[11px] text-slate-400 bg-slate-50 p-3 rounded-lg border text-left">
                 <strong>Audit Record:</strong> All created employee profiles have been registered in Employee Master and logged to Central Audit Log under current session user ({currentUser?.email}).

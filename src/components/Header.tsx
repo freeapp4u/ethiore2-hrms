@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { User, UserRole } from "../types";
-import { Bell, HelpCircle, LogOut, User as UserIcon, Lock, Menu, X, Check, Save } from "lucide-react";
+import { Bell, HelpCircle, LogOut, User as UserIcon, Lock, Menu, X, Check, Save, ShieldCheck } from "lucide-react";
 
 interface HeaderProps {
   currentUser: User | null;
@@ -157,7 +157,13 @@ export default function Header({
           <span className="hidden md:inline text-xs font-semibold text-slate-600">Help</span>
         </button>
 
-        <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
+        {/* Read-Only Auditor Badge */}
+        {currentUser?.role === "Auditor" && (
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded-full text-xs font-bold shadow-2xs">
+            <ShieldCheck className="h-4 w-4 text-amber-600" />
+            <span>Read-Only Auditor Mode</span>
+          </div>
+        )}
 
         {/* User Account Controls */}
         {currentUser && (

@@ -8,7 +8,7 @@
         "id": { "type": "string", "maxLength": 128 },
         "fullName": { "type": "string", "maxLength": 256 },
         "email": { "type": "string", "maxLength": 256, "pattern": "^[^@]+@[^@]+\\.[^@]+$" },
-        "role": { "type": "string", "enum": ["Administrator", "HR Officer"] },
+        "role": { "type": "string", "enum": ["Administrator", "HR Officer", "Auditor"] },
         "status": { "type": "string", "enum": ["Active", "Inactive", "Suspended"] },
         "createdDate": { "type": "string", "maxLength": 64 }
       },

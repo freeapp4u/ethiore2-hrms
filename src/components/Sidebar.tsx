@@ -159,7 +159,7 @@ export default function Sidebar({
                       >
                         Leave Calendar
                       </button>
-                      {role === "Administrator" && (
+                      {(role === "Administrator" || role === "Auditor") && (
                         <button
                           onClick={() => navigateTo("leaves_config")}
                           className={subNavItemClass("leaves_config")}
@@ -220,7 +220,7 @@ export default function Sidebar({
                       >
                         Family Registry
                       </button>
-                      {role === "Administrator" && (
+                      {(role === "Administrator" || role === "Auditor") && (
                         <button
                           onClick={() => navigateTo("medical_policy")}
                           className={subNavItemClass("medical_policy")}
@@ -268,8 +268,7 @@ export default function Sidebar({
                     Departments
                   </button>
 
-                  {/* Restrict these from HR Officer */}
-                  {role === "Administrator" && (
+                  {(role === "Administrator" || role === "Auditor") && (
                     <>
                       <button
                         onClick={() => navigateTo("profile")}
@@ -300,8 +299,8 @@ export default function Sidebar({
               )}
             </div>
 
-            {/* Administration Block - Only for Admin */}
-            {role === "Administrator" && (
+            {/* Administration Block - Admin and Auditor */}
+            {(role === "Administrator" || role === "Auditor") && (
               <div>
                 <button
                   onClick={() => setAdminExpanded(!adminExpanded)}

@@ -138,7 +138,7 @@ export default function Reports({
         const empName = employees.find(e => e.employeeId === a.employeeId)?.fullName || a.employeeId;
         csvContent += `"${a.id}","${a.employeeId}","${empName}","${a.date}","${a.checkInTime || "-"}","${a.checkOutTime || "-"}","${a.workingHours}","${a.lateStatus}","${a.status}","${a.remarks}"\r\n`;
       });
-    } else if (activeReportTab === "audit" && currentUser?.role === "Administrator") {
+    } else if (activeReportTab === "audit" && (currentUser?.role === "Administrator" || currentUser?.role === "Auditor")) {
       csvContent += "Timestamp,User,Module,Action,Record,Details\r\n";
       filteredAuditLogs.forEach(log => {
         csvContent += `"${log.timestamp}","${log.userEmail}","${log.module}","${log.action}","${log.recordEntity}","${log.details}"\r\n`;
@@ -192,7 +192,7 @@ export default function Reports({
             <Clock className="h-4 w-4" />
             <span>Attendance &amp; Lateness</span>
           </button>
-          {currentUser?.role === "Administrator" && (
+          {(currentUser?.role === "Administrator" || currentUser?.role === "Auditor") && (
             <button
               onClick={() => setActiveReportTab("audit")}
               className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all ${
@@ -653,8 +653,8 @@ export default function Reports({
         </div>
       )}
 
-      {/* --- REPORT VIEW 4: ACTIVITY AUDIT LOGS (ADMIN ONLY) --- */}
-      {activeReportTab === "audit" && currentUser?.role === "Administrator" && (
+      {/* --- REPORT VIEW 4: ACTIVITY AUDIT LOGS (ADMIN & AUDITOR) --- */}
+      {activeReportTab === "audit" && (currentUser?.role === "Administrator" || currentUser?.role === "Auditor") && (
         <div className="space-y-6">
           {/* Quick info banner */}
           <div className="bg-slate-50 border border-slate-100 p-4 rounded-lg text-xs text-slate-600 font-medium leading-relaxed flex items-center gap-2">
