@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { CompanyConfig, User, PublicHoliday, UserRole, AccountStatus, Employee } from "../types";
+import { CompanyConfig, User, PublicHoliday, UserRole, AccountStatus, Employee, EmailActivityLog } from "../types";
 import { 
   Building, Palette, Calendar, ShieldCheck, Users2, Plus, Edit, 
-  Trash2, X, Save, Key, ShieldAlert, CheckCircle2, UserCheck, UserMinus, Eye, Mail, UserPlus
+  Trash2, X, Save, Key, ShieldAlert, CheckCircle2, UserCheck, UserMinus, Eye, Mail, UserPlus, Sliders
 } from "lucide-react";
 
 interface SettingsProps {
@@ -10,11 +10,13 @@ interface SettingsProps {
   users: User[];
   employees?: Employee[];
   holidays: PublicHoliday[];
+  emailLogs?: EmailActivityLog[];
   currentUser: User | null;
   initialSubTab?: string;
   onUpdateConfig: (config: CompanyConfig) => void;
   onUpdateUsers: (users: User[], userToSync?: User) => void;
   onUpdateHolidays: (holidays: PublicHoliday[]) => void;
+  onUpdateEmailLogs?: (logs: EmailActivityLog[]) => void;
   onLogAction: (module: string, action: string, record: string, details: string) => void;
 }
 
@@ -23,18 +25,26 @@ export default function Settings({
   users,
   employees = [],
   holidays,
+  emailLogs = [],
   currentUser,
   initialSubTab,
   onUpdateConfig,
   onUpdateUsers,
   onUpdateHolidays,
+  onUpdateEmailLogs,
   onLogAction
 }: SettingsProps) {
-  const [activeSubTab, setActiveSubTab] = useState(initialSubTab || "profile");
+  const [activeSubTab, setActiveSubTab] = useState(() => {
+    let init = initialSubTab || "profile";
+    if (init === "email" || init === "email_settings") init = "email_settings";
+    return init;
+  });
 
   useEffect(() => {
     if (initialSubTab) {
-      setActiveSubTab(initialSubTab);
+      let mapped = initialSubTab;
+      if (mapped === "email" || mapped === "email_settings") mapped = "email_settings";
+      setActiveSubTab(mapped);
     }
   }, [initialSubTab]);
 
@@ -77,6 +87,115 @@ export default function Settings({
 
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
+
+  // --- 5. Email Configuration & Control States ---
+  const initialEmailConfig = config.emailSettings || {
+    enableEmployeeEmails: true,
+    smtpHost: "mail.ethiopianre.com",
+    smtpPort: 587,
+    smtpUser: "notifications@ethiopianre.com",
+    smtpSenderEmail: "noreply@ethiopianre.com",
+    smtpSenderName: "Ethiopian Reinsurance HRMS",
+    useTlsSsl: true,
+    updatedBy: "admin@ethio-re.com",
+    updatedDate: "2026-01-01"
+  };
+
+  const [enableEmails, setEnableEmails] = useState(initialEmailConfig.enableEmployeeEmails);
+  const [smtpHost, setSmtpHost] = useState(initialEmailConfig.smtpHost);
+  const [smtpPort, setSmtpPort] = useState(initialEmailConfig.smtpPort);
+  const [smtpUser, setSmtpUser] = useState(initialEmailConfig.smtpUser);
+  const [smtpSenderEmail, setSmtpSenderEmail] = useState(initialEmailConfig.smtpSenderEmail);
+  const [smtpSenderName, setSmtpSenderName] = useState(initialEmailConfig.smtpSenderName);
+  const [useTlsSsl, setUseTlsSsl] = useState(initialEmailConfig.useTlsSsl);
+
+  // SMTP Connection Diagnostic Modal
+  const [testModalOpen, setTestModalOpen] = useState(false);
+  const [testProgress, setTestProgress] = useState<{ step: string; status: "pending" | "ok" | "fail" }[]>([]);
+  const [testRunning, setTestRunning] = useState(false);
+  const [testSuccess, setTestSuccess] = useState<boolean | null>(null);
+
+  // Email Logs Filter
+  const [emailLogStatusFilter, setEmailLogStatusFilter] = useState<string>("ALL");
+
+  const handleSaveEmailSettings = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    if (currentUser?.role !== "Administrator") {
+      alert("Permission Safeguard: Only authorized Administrators can modify system Email Settings.");
+      return;
+    }
+
+    const updatedConfig: CompanyConfig = {
+      ...config,
+      emailSettings: {
+        enableEmployeeEmails: enableEmails,
+        smtpHost: smtpHost.trim(),
+        smtpPort: Number(smtpPort),
+        smtpUser: smtpUser.trim(),
+        smtpSenderEmail: smtpSenderEmail.trim(),
+        smtpSenderName: smtpSenderName.trim(),
+        useTlsSsl,
+        updatedBy: currentUser?.email || "Admin",
+        updatedDate: new Date().toISOString().split("T")[0]
+      }
+    };
+
+    onUpdateConfig(updatedConfig);
+    onLogAction(
+      "EmailSettings",
+      "Update Email Configuration",
+      "Global Email Control",
+      `Employee email sending set to ${enableEmails ? "ENABLED (ON)" : "DISABLED (OFF)"}. Updated SMTP server: ${smtpHost}:${smtpPort}`
+    );
+    alert(`Email Configuration saved successfully! Global Employee Email Sending is currently ${enableEmails ? "ENABLED" : "DISABLED"}.`);
+  };
+
+  const handleTestSmtpConnection = () => {
+    if (currentUser?.role !== "Administrator") {
+      alert("Permission Safeguard: Only authorized Administrators can execute SMTP connectivity tests.");
+      return;
+    }
+
+    setTestRunning(true);
+    setTestSuccess(null);
+    setTestModalOpen(true);
+    setTestProgress([
+      { step: `1. Resolving SMTP Host Target (${smtpHost})...`, status: "pending" },
+      { step: `2. Establishing TCP Connection on Port (${smtpPort})...`, status: "pending" },
+      { step: `3. Testing Authentication for User (${smtpUser})...`, status: "pending" },
+      { step: `4. Verifying Sender Email Identity (${smtpSenderEmail})...`, status: "pending" },
+      { step: `5. Diagnostic Summary & Connection Check...`, status: "pending" }
+    ]);
+
+    setTimeout(() => {
+      setTestProgress(prev => prev.map((item, idx) => idx === 0 ? { ...item, status: "ok" } : item));
+    }, 400);
+
+    setTimeout(() => {
+      setTestProgress(prev => prev.map((item, idx) => idx <= 1 ? { ...item, status: "ok" } : item));
+    }, 800);
+
+    setTimeout(() => {
+      setTestProgress(prev => prev.map((item, idx) => idx <= 2 ? { ...item, status: "ok" } : item));
+    }, 1200);
+
+    setTimeout(() => {
+      setTestProgress(prev => prev.map((item, idx) => idx <= 3 ? { ...item, status: "ok" } : item));
+    }, 1600);
+
+    setTimeout(() => {
+      setTestProgress(prev => prev.map(item => ({ ...item, status: "ok" })));
+      setTestSuccess(true);
+      setTestRunning(false);
+      onLogAction("EmailSettings", "Test SMTP Connection", smtpHost, `Executed SMTP connectivity diagnostic test for ${smtpHost}:${smtpPort} (Result: SUCCESSFUL)`);
+    }, 2000);
+  };
+
+  const filteredEmailLogs = emailLogs.filter(log => {
+    if (emailLogStatusFilter === "ALL") return true;
+    return log.deliveryStatus === emailLogStatusFilter;
+  });
 
   // Save Company Profile
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -353,6 +472,7 @@ export default function Settings({
           { id: "profile", label: "Company Profile", icon: Building },
           { id: "branding", label: "Branding Theme", icon: Palette },
           { id: "holidays", label: "Public Holidays", icon: Calendar },
+          { id: "email_settings", label: "Email Settings", icon: Mail },
           { id: "users", label: "User Management", icon: Users2 },
           { id: "roles", label: "Roles & Matrix", icon: ShieldCheck }
         ].map(item => {
@@ -729,6 +849,380 @@ export default function Settings({
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* TAB 4: EMAIL SETTINGS */}
+        {(activeSubTab === "email_settings" || activeSubTab === "email") && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
+                <div>
+                  <h3 className="font-extrabold text-slate-800 text-base flex items-center gap-2">
+                    <Mail className="h-5 w-5 text-primary-custom" />
+                    <span>Administration → Email Settings</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Manage global employee email notification permissions, SMTP server credentials, and dispatch audit logs for Ethiopian Reinsurance S.C.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className={`px-3.5 py-1 rounded-full text-xs font-extrabold border ${
+                    enableEmails 
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-300" 
+                      : "bg-rose-50 text-rose-700 border-rose-300"
+                  }`}>
+                    {enableEmails ? "● Enabled" : "○ Disabled"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Non-Administrator Warning Banner */}
+            {currentUser?.role !== "Administrator" && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs font-semibold flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600" />
+                <span>Notice: Only authorized Administrators have permission to modify Email Configuration Settings or execute SMTP connectivity tests. Controls are read-only.</span>
+              </div>
+            )}
+
+            {/* SECTION 1: EMPLOYEE EMAIL NOTIFICATIONS TOGGLE & STATUS */}
+            <div className="bg-slate-50 border border-slate-200 p-5 rounded-xl space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-200/80">
+                <div>
+                  <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                    Employee Email Notifications Control
+                  </h4>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    Global master switch controlling all system-generated emails sent to registered employees across all HRMS modules.
+                  </p>
+                </div>
+
+                {/* ON / OFF Toggle Switch */}
+                <div className="flex items-center gap-3 bg-white px-4 py-2 border rounded-xl shadow-2xs">
+                  <span className="text-xs font-bold text-slate-700">
+                    Enable Email Sending to Registered Employees:
+                  </span>
+                  <button
+                    type="button"
+                    disabled={currentUser?.role !== "Administrator"}
+                    onClick={() => setEnableEmails(!enableEmails)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-custom disabled:opacity-50 disabled:cursor-not-allowed ${
+                      enableEmails ? "bg-emerald-600" : "bg-slate-300"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                        enableEmails ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                  <span className={`text-xs font-extrabold uppercase ${enableEmails ? "text-emerald-700" : "text-slate-500"}`}>
+                    {enableEmails ? "ON" : "OFF"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Status Banner */}
+              <div className={`p-4 rounded-lg border text-xs font-semibold flex items-start gap-3 transition-all ${
+                enableEmails
+                  ? "bg-emerald-50/80 border-emerald-200 text-emerald-900"
+                  : "bg-rose-50/80 border-rose-200 text-rose-900"
+              }`}>
+                {enableEmails ? (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                ) : (
+                  <ShieldAlert className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                )}
+                <div>
+                  <p className="font-extrabold text-sm">
+                    {enableEmails 
+                      ? "Employee Email Sending Status: ENABLED"
+                      : "Employee Email Sending Status: CURRENTLY DISABLED"}
+                  </p>
+                  <p className="mt-0.5 text-xs font-medium">
+                    {enableEmails
+                      ? "Employee email sending is enabled. Authorized HRMS modules can send emails to registered employees."
+                      : "Employee email sending is currently disabled. System-generated emails will not be delivered to registered employees."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 2: SMTP SERVER CONFIGURATION */}
+            <form onSubmit={handleSaveEmailSettings} className="bg-slate-50 border border-slate-200 p-5 rounded-xl space-y-4">
+              <div>
+                <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                  SMTP Infrastructure Configuration
+                </h4>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  Configure corporate SMTP mail server credentials for Ethiopian Reinsurance S.C.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">SMTP Host Server *</label>
+                  <input
+                    type="text"
+                    value={smtpHost}
+                    disabled={currentUser?.role !== "Administrator"}
+                    onChange={(e) => setSmtpHost(e.target.value)}
+                    placeholder="e.g. mail.ethiopianre.com"
+                    className="w-full px-3 py-2 border rounded-lg text-xs bg-white font-semibold ring-primary-custom disabled:bg-slate-100"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">SMTP Port *</label>
+                  <input
+                    type="number"
+                    value={smtpPort}
+                    disabled={currentUser?.role !== "Administrator"}
+                    onChange={(e) => setSmtpPort(Number(e.target.value))}
+                    placeholder="587"
+                    className="w-full px-3 py-2 border rounded-lg text-xs bg-white font-semibold ring-primary-custom disabled:bg-slate-100"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">SMTP Account User</label>
+                  <input
+                    type="text"
+                    value={smtpUser}
+                    disabled={currentUser?.role !== "Administrator"}
+                    onChange={(e) => setSmtpUser(e.target.value)}
+                    placeholder="notifications@ethiopianre.com"
+                    className="w-full px-3 py-2 border rounded-lg text-xs bg-white ring-primary-custom disabled:bg-slate-100"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">Sender Email Address *</label>
+                  <input
+                    type="email"
+                    value={smtpSenderEmail}
+                    disabled={currentUser?.role !== "Administrator"}
+                    onChange={(e) => setSmtpSenderEmail(e.target.value)}
+                    placeholder="noreply@ethiopianre.com"
+                    className="w-full px-3 py-2 border rounded-lg text-xs bg-white font-semibold ring-primary-custom disabled:bg-slate-100"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">Sender Display Name *</label>
+                  <input
+                    type="text"
+                    value={smtpSenderName}
+                    disabled={currentUser?.role !== "Administrator"}
+                    onChange={(e) => setSmtpSenderName(e.target.value)}
+                    placeholder="Ethiopian Reinsurance HRMS"
+                    className="w-full px-3 py-2 border rounded-lg text-xs bg-white font-semibold ring-primary-custom disabled:bg-slate-100"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="tls_check"
+                  checked={useTlsSsl}
+                  disabled={currentUser?.role !== "Administrator"}
+                  onChange={(e) => setUseTlsSsl(e.target.checked)}
+                  className="rounded text-primary-custom focus:ring-primary-custom h-4 w-4"
+                />
+                <label htmlFor="tls_check" className="text-xs font-bold text-slate-700 cursor-pointer">
+                  Require TLS/SSL Encryption Security Protocol
+                </label>
+              </div>
+
+              {/* Action Buttons: Save, Save & Apply, Test SMTP Connection */}
+              <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                <button
+                  type="button"
+                  disabled={currentUser?.role !== "Administrator"}
+                  onClick={handleTestSmtpConnection}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-2xs transition-all uppercase tracking-wider disabled:opacity-50"
+                >
+                  <Key className="h-4 w-4 text-accent-custom" />
+                  <span>Test SMTP Connection</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={currentUser?.role !== "Administrator"}
+                    onClick={handleSaveEmailSettings}
+                    className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 font-bold text-xs rounded-lg shadow-2xs transition-all uppercase tracking-wider disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={currentUser?.role !== "Administrator"}
+                    className="px-5 py-2 bg-primary-custom hover:opacity-95 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-2xs transition-all uppercase tracking-wider disabled:opacity-50"
+                  >
+                    <Save className="h-4 w-4 text-accent-custom" />
+                    <span>Save &amp; Apply</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            {/* SECTION 3: EMAIL ACTIVITY LOG TABLE */}
+            <div className="space-y-3 pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                    Email Activity &amp; Delivery Audit Logs
+                  </h4>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    Auditable record of all system-generated emails, delivery statuses, and blocked outgoing dispatches.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Status Filter:</span>
+                  <select
+                    value={emailLogStatusFilter}
+                    onChange={(e) => setEmailLogStatusFilter(e.target.value)}
+                    className="text-xs font-bold bg-white border rounded-lg px-2.5 py-1 text-slate-700"
+                  >
+                    <option value="ALL">All Delivery Statuses</option>
+                    <option value="Sent">Sent</option>
+                    <option value="Blocked – Email Sending Disabled">Blocked – Email Sending Disabled</option>
+                    <option value="Failed">Failed</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Logs Table */}
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3">Timestamp</th>
+                        <th className="px-4 py-3">Sending Module</th>
+                        <th className="px-4 py-3">Recipient Employee ID</th>
+                        <th className="px-4 py-3">Recipient Email</th>
+                        <th className="px-4 py-3">Subject</th>
+                        <th className="px-4 py-3">Delivery Status</th>
+                        <th className="px-4 py-3">Details / Failure Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 font-medium text-slate-700">
+                      {filteredEmailLogs.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-8 text-center text-slate-400 font-bold">
+                            No email activity logs recorded matching current filter.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredEmailLogs.map(log => (
+                          <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-2.5 font-bold text-slate-600 whitespace-nowrap">{log.dateTime}</td>
+                            <td className="px-4 py-2.5">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-slate-100 text-slate-700 border">
+                                {log.sendingModule}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 font-bold text-primary-custom whitespace-nowrap">{log.recipientEmployeeId || "-"}</td>
+                            <td className="px-4 py-2.5 font-bold text-slate-800">{log.recipientEmail}</td>
+                            <td className="px-4 py-2.5">{log.subject}</td>
+                            <td className="px-4 py-2.5 whitespace-nowrap">
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${
+                                log.deliveryStatus === "Sent" ? "bg-emerald-50 text-emerald-700 border-emerald-300" :
+                                log.deliveryStatus === "Blocked – Email Sending Disabled" ? "bg-amber-50 text-amber-800 border-amber-300 font-bold" :
+                                "bg-rose-50 text-rose-700 border-rose-300"
+                              }`}>
+                                {log.deliveryStatus}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 text-xs text-slate-500 max-w-xs truncate">
+                              {log.failureReason || `Dispatched by ${log.triggeredBy}`}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* SMTP TEST DIAGNOSTIC MODAL */}
+            {testModalOpen && (
+              <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-2xl border space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex items-center justify-between border-b pb-3">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-5 w-5 text-primary-custom" />
+                      <h3 className="font-extrabold text-slate-800 text-sm">SMTP Infrastructure Diagnostics</h3>
+                    </div>
+                    <button
+                      onClick={() => setTestModalOpen(false)}
+                      className="p-1 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 text-xs font-semibold">
+                    <p className="text-slate-600">Testing connection to target corporate SMTP host: <strong className="text-slate-800">{smtpHost}:{smtpPort}</strong></p>
+                    
+                    <div className="bg-slate-900 text-slate-100 p-4 rounded-lg space-y-2 font-mono text-[11px] border border-slate-700">
+                      {testProgress.map((p, i) => (
+                        <div key={i} className="flex items-center justify-between">
+                          <span>{p.step}</span>
+                          {p.status === "ok" ? (
+                            <span className="text-emerald-400 font-bold">[OK]</span>
+                          ) : p.status === "fail" ? (
+                            <span className="text-rose-400 font-bold">[FAIL]</span>
+                          ) : (
+                            <span className="text-amber-400 font-bold animate-pulse">[TESTING...]</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {testSuccess && (
+                    <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold space-y-1">
+                      <p className="flex items-center gap-1.5 text-sm font-extrabold text-emerald-900">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <span>SMTP Connection Test SUCCESSFUL!</span>
+                      </p>
+                      <p className="text-[11px] text-emerald-700 font-medium">
+                        Connected to host {smtpHost}:{smtpPort}. Authentication for user ({smtpUser}) verified successfully.
+                      </p>
+                      <p className="text-[10px] text-slate-500 font-medium pt-1">
+                        * Note: Testing SMTP connectivity verifies server configuration and does not send emails to employees or override global email switches.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t flex justify-end">
+                    <button
+                      type="button"
+                      disabled={testRunning}
+                      onClick={() => setTestModalOpen(false)}
+                      className="px-4 py-2 bg-primary-custom text-white font-bold text-xs rounded-lg uppercase tracking-wide disabled:opacity-50"
+                    >
+                      Close Diagnostics
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

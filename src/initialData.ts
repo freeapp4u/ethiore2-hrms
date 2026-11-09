@@ -1,4 +1,10 @@
-import { User, Department, Employee, AttendanceRecord, LeaveRecord, PublicHoliday, CompanyConfig, ActivityLog, FamilyMember, MedicalExpense } from "./types";
+import { 
+  User, Department, Employee, AttendanceRecord, LeaveRecord, PublicHoliday, 
+  CompanyConfig, ActivityLog, FamilyMember, MedicalExpense,
+  SalaryComponent, PayrollPeriod, EmployeeSalaryStructure, PayrollRecord, 
+  PayrollApproval, Payslip, PayslipDistributionLog, PayrollImportLog, PayrollSettings,
+  EmailActivityLog
+} from "./types";
 
 export const DEFAULT_USERS: User[] = [
   {
@@ -234,6 +240,17 @@ export const DEFAULT_COMPANY_CONFIG: CompanyConfig = {
     employeeAllocationUnlimited: true,
     requiresInvoiceNumber: true,
     currencySymbol: "ETB"
+  },
+  emailSettings: {
+    enableEmployeeEmails: true,
+    smtpHost: "mail.ethiopianre.com",
+    smtpPort: 587,
+    smtpUser: "notifications@ethiopianre.com",
+    smtpSenderEmail: "noreply@ethiopianre.com",
+    smtpSenderName: "Ethiopian Reinsurance HRMS",
+    useTlsSsl: true,
+    updatedBy: "admin@ethio-re.com",
+    updatedDate: "2026-01-01"
   }
 };
 
@@ -242,3 +259,239 @@ export const DEFAULT_FAMILY_MEMBERS: FamilyMember[] = [];
 export const DEFAULT_MEDICAL_EXPENSES: MedicalExpense[] = [];
 
 export const DEFAULT_ACTIVITY_LOGS: ActivityLog[] = [];
+
+export const DEFAULT_EMAIL_LOGS: EmailActivityLog[] = [
+  {
+    id: "EMAIL_LOG_INIT_1",
+    recipientEmployeeId: "EMP_001",
+    recipientEmail: "almaz.bekele@ethiopianre.com",
+    subject: "Payslip Statement - January 2026",
+    sendingModule: "Payslip Distribution",
+    dateTime: "2026-01-28 14:30:00",
+    deliveryStatus: "Sent",
+    triggeredBy: "admin@ethio-re.com"
+  }
+];
+
+// ==========================================
+// DEFAULT PAYROLL INITIAL DATASET
+// ==========================================
+
+export const DEFAULT_SALARY_COMPONENTS: SalaryComponent[] = [
+  // EARNINGS
+  {
+    id: "SC_BS",
+    name: "Basic Salary",
+    code: "BS",
+    type: "Earning",
+    calculationMethod: "Based on Basic Salary",
+    calculationValue: 100,
+    isTaxable: true,
+    isPensionable: true,
+    effectiveDate: "2026-01-01",
+    status: "Active",
+    description: "Contractual base monthly remuneration.",
+    isSystemDefault: true
+  },
+  {
+    id: "SC_PA",
+    name: "Position Allowance",
+    code: "PA",
+    type: "Earning",
+    calculationMethod: "Fixed Amount",
+    calculationValue: 0,
+    isTaxable: true,
+    isPensionable: false,
+    effectiveDate: "2026-01-01",
+    status: "Active",
+    description: "Allowance attached to managerial and technical position rank.",
+    isSystemDefault: true
+  },
+  {
+    id: "SC_TA",
+    name: "Transport Allowance",
+    code: "TA",
+    type: "Earning",
+    calculationMethod: "Fixed Amount",
+    calculationValue: 0,
+    isTaxable: true,
+    isPensionable: false,
+    taxExemptLimitETB: 2200,
+    effectiveDate: "2026-01-01",
+    status: "Active",
+    description: "Monthly transport allowance (Tax-exempt up to 1/4 basic salary or 2,200 ETB cap).",
+    isSystemDefault: true
+  },
+  {
+    id: "SC_HA",
+    name: "Housing Allowance",
+    code: "HA",
+    type: "Earning",
+    calculationMethod: "Fixed Amount",
+    calculationValue: 0,
+    isTaxable: true,
+    isPensionable: false,
+    effectiveDate: "2026-01-01",
+    status: "Active",
+    description: "Monthly housing/accommodation subsidy.",
+    isSystemDefault: true
+  },
+  {
+    id: "SC_RA",
+    name: "Responsibility Allowance",
+    code: "RA",
+    type: "Earning",
+    calculationMethod: "Fixed Amount",
+    calculationValue: 0,
+    isTaxable: true,
+    isPensionable: false,
+    effectiveDate: "2026-01-01",
+    status: "Active",
+    description: "Allowance for key organizational leadership responsibilities.",
+    isSystemDefault: true
+  },
+  {
+    id: "SC_TEL",
+    name: "Telephone Allowance",
+    code: "TEL",
+    type: "Earning",
+    calculationMethod: "Fixed Amount",
+    calculationValue: 0,
+    isTaxable: true,
+    isPensionable: false,
+    effectiveDate: "2026-01-01",
+    status: "Active",
+    description: "Monthly communication allowance.",
+    isSystemDefault: true
+  },
+  {
+    id: "SC_OT",
+    name: "Overtime",
+    code: "OT",
+    type: "Earning",
+    calculationMethod: "Fixed Amount",
+    calculationValue: 0,
+    isTaxable: true,
+    isPensionable: false,
+    effectiveDate: "2026-01-01",
+    status: "Active",
+    description: "Overtime hours remuneration calculated under labor legislation.",
+    isSystemDefault: true
+  },
+  {
+    id: "SC_OA",
+    name: "Other Allowances",
+    code: "OA",
+    type: "Earning",
+    calculationMethod: "Fixed Amount",
+    calculationValue: 0,
+    isTaxable: true,
+    isPensionable: false,
+    effectiveDate: "2026-01-01",
+    status: "Active",
+    description: "Discretionary or project-specific earnings.",
+    isSystemDefault: true
+  },
+  // DEDUCTIONS
+  {
+    id: "SC_PIT",
+    name: "Employment Income Tax",
+    code: "PIT",
+    type: "Deduction",
+    calculationMethod: "Formula-Based",
+    calculationValue: 0,
+    isTaxable: false,
+    isPensionable: false,
+    effectiveDate: "2026-01-01",
+    status: "Active",
+    description: "Statutory Ethiopian progressive employment income tax.",
+    isSystemDefault: true
+  },
+  {
+    id: "SC_PEN_EE",
+    name: "Employee Pension Contribution",
+    code: "PEN_EE",
+    type: "Deduction",
+    calculationMethod: "Based on Basic Salary",
+    calculationValue: 7, // 7%
+    isTaxable: false,
+    isPensionable: true,
+    effectiveDate: "2026-01-01",
+    status: "Active",
+    description: "Statutory 7% employee pension contribution withheld from basic salary.",
+    isSystemDefault: true
+  },
+  {
+    id: "SC_LOAN",
+    name: "Loan Repayment",
+    code: "LOAN",
+    type: "Deduction",
+    calculationMethod: "Fixed Amount",
+    calculationValue: 0,
+    isTaxable: false,
+    isPensionable: false,
+    effectiveDate: "2026-01-01",
+    status: "Active",
+    description: "Monthly staff salary advance or credit loan installment.",
+    isSystemDefault: true
+  },
+  {
+    id: "SC_OD",
+    name: "Other Deductions",
+    code: "OD",
+    type: "Deduction",
+    calculationMethod: "Fixed Amount",
+    calculationValue: 0,
+    isTaxable: false,
+    isPensionable: false,
+    effectiveDate: "2026-01-01",
+    status: "Active",
+    description: "Miscellaneous authorized staff deductions.",
+    isSystemDefault: true
+  }
+];
+
+export const DEFAULT_PAYROLL_PERIODS: PayrollPeriod[] = [
+  {
+    id: "PP_2026_01",
+    periodName: "January 2026",
+    startDate: "2026-01-01",
+    endDate: "2026-01-31",
+    paymentDate: "2026-01-28",
+    status: "Open",
+    createdBy: "admin@ethio-re.com",
+    createdDate: "2026-01-01"
+  },
+  {
+    id: "PP_2026_02",
+    periodName: "February 2026",
+    startDate: "2026-02-01",
+    endDate: "2026-02-28",
+    paymentDate: "2026-02-26",
+    status: "Open",
+    createdBy: "admin@ethio-re.com",
+    createdDate: "2026-02-01"
+  }
+];
+
+export const DEFAULT_EMPLOYEE_SALARY_STRUCTURES: EmployeeSalaryStructure[] = [];
+
+export const DEFAULT_PAYROLL_RECORDS: PayrollRecord[] = [];
+
+export const DEFAULT_PAYROLL_APPROVALS: PayrollApproval[] = [];
+
+export const DEFAULT_PAYSLIPS: Payslip[] = [];
+
+export const DEFAULT_PAYSLIP_DISTRIBUTION_LOGS: PayslipDistributionLog[] = [];
+
+export const DEFAULT_PAYROLL_IMPORT_LOGS: PayrollImportLog[] = [];
+
+export const DEFAULT_PAYROLL_SETTINGS: PayrollSettings = {
+  id: "PAYROLL_SETTINGS_MAIN",
+  companyName: "Ethiopian Reinsurance S.C.",
+  currency: "ETB",
+  autoEmailPayslipsOnApproval: true,
+  updatedBy: "admin@ethio-re.com",
+  updatedDate: "2026-01-01"
+};
+

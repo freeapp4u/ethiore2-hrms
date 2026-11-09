@@ -1,7 +1,7 @@
 import { 
   LayoutDashboard, UserCheck, CalendarDays,
   BarChart3, Users, Landmark, FileText, Palette, Calendar, 
-  Users2, ShieldCheck, History, ChevronDown, ChevronRight, X, FolderOpen, HeartPulse
+  Users2, ShieldCheck, History, ChevronDown, ChevronRight, X, FolderOpen, HeartPulse, DollarSign, Mail
 } from "lucide-react";
 import { useState } from "react";
 import { UserRole } from "../types";
@@ -24,8 +24,14 @@ export default function Sidebar({
 }: SidebarProps) {
   const [leaveExpanded, setLeaveExpanded] = useState(true);
   const [medicalExpanded, setMedicalExpanded] = useState(true);
+  const [payrollExpanded, setPayrollExpanded] = useState(() => activeTab.startsWith("payroll"));
   const [settingsExpanded, setSettingsExpanded] = useState(true);
   const [adminExpanded, setAdminExpanded] = useState(true);
+
+  // Auto-expand payroll accordion when activeTab starts with payroll
+  if (activeTab.startsWith("payroll") && !payrollExpanded) {
+    setPayrollExpanded(true);
+  }
 
   const navigateTo = (tabId: string) => {
     onTabChange(tabId);
@@ -45,10 +51,12 @@ export default function Sidebar({
   };
 
   const subNavItemClass = (tabId: string) => {
-    const isActive = activeTab === tabId;
+    const isActive = activeTab === tabId || 
+      (tabId === "payroll_import" && (activeTab === "payroll_import" || activeTab === "payroll_csv_import")) ||
+      (tabId === "payroll_export" && (activeTab === "payroll_export" || activeTab === "payroll_csv_export"));
     return `w-full text-left pl-9 pr-3 py-2 rounded-lg flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase transition-all ${
       isActive
-        ? "text-accent-custom bg-white/5 font-bold"
+        ? "text-accent-custom bg-white/10 font-bold border-l-2 border-accent-custom"
         : "text-slate-400 hover:text-white hover:bg-white/5"
     }`;
   };
@@ -70,20 +78,44 @@ export default function Sidebar({
         }`}
       >
         <div className="flex flex-col flex-1 overflow-y-auto">
-          {/* Logo & Close Button (Mobile Only) */}
-          <div className="h-16 px-6 flex items-center justify-between border-b border-white/10 shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-full bg-accent-custom flex items-center justify-center text-slate-900 font-bold text-xs shadow-xs">
-                ER
+          {/* Logo & Branding Area (Africa Emblem + "Rising with Africa" Slogan) */}
+          <div className="h-20 px-4 py-3 flex items-center justify-between border-b border-white/10 shrink-0 bg-[#001F44]">
+            <div className="flex items-center">
+              {/* Modern Circular Emblem with African Continent Silhouette & Flag Accents */}
+              <div 
+                className="relative p-0.5 rounded-full bg-gradient-to-tr from-[#009A44] via-[#FED100] to-[#E62529] shadow-md shrink-0 transition-transform hover:scale-105"
+                title="Rising with Africa - ETRHRMS"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#002B5B] flex items-center justify-center p-1.5 text-[#FED100] border border-white/20 shadow-inner">
+                  <svg 
+                    viewBox="0 0 100 100" 
+                    className="w-full h-full drop-shadow-xs" 
+                    fill="currentColor"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    {/* Africa Continent Silhouette */}
+                    <path d="M 27,20 C 33,18 42,17 52,18 C 60,19 67,17 76,21 C 80,23 77,28 74,32 C 73,36 78,39 83,42 C 88,45 89,50 85,54 C 81,58 76,60 74,64 C 72,68 66,75 62,81 C 57,87 52,89 47,86 C 44,82 46,75 44,71 C 42,67 38,64 35,60 C 31,59 27,59 23,57 C 18,54 15,49 14,44 C 13,38 16,33 20,29 C 23,26 25,23 27,20 Z" />
+                    {/* Madagascar Island */}
+                    <path d="M 81,64 C 83,66 85,72 83,78 C 81,78 79,72 81,64 Z" />
+                  </svg>
+                </div>
               </div>
-              <div className="text-left">
-                <p className="font-extrabold text-sm tracking-tight leading-none text-white">ETHIO-RE</p>
-                <p className="text-[9px] font-semibold text-accent-custom tracking-widest mt-0.5 uppercase">HRMS Engine</p>
+
+              {/* Subtle Vertical Divider */}
+              <div className="h-8 w-px bg-white/20 mx-3 shrink-0" />
+
+              {/* Slogan: Rising with Africa */}
+              <div className="flex flex-col justify-center text-left leading-tight shrink-0">
+                <span className="font-black italic text-sm tracking-tight text-white drop-shadow-xs">Rising</span>
+                <span className="font-extrabold italic text-xs tracking-tight text-[#FED100] drop-shadow-xs">with Africa</span>
               </div>
             </div>
+
+            {/* Mobile Close Button */}
             <button
               onClick={onClose}
-              className="lg:hidden p-1 rounded-full hover:bg-white/10 text-white"
+              className="lg:hidden p-1 rounded-full hover:bg-white/10 text-white transition-colors"
+              aria-label="Close Navigation"
             >
               <X className="h-5 w-5" />
             </button>
@@ -237,6 +269,98 @@ export default function Sidebar({
                     </div>
                   )}
                 </div>
+
+                {/* Payroll Management */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => {
+                        setPayrollExpanded(true);
+                        navigateTo("payroll_dashboard");
+                      }}
+                      className={`flex-1 text-left py-2.5 flex items-center gap-3 text-xs font-semibold tracking-wide transition-all ${
+                        activeTab.startsWith("payroll")
+                          ? "bg-accent-custom/20 text-accent-custom border-l-4 border-accent-custom pl-4 pr-1 rounded-r font-bold"
+                          : "text-slate-300 hover:bg-white/10 hover:text-white pl-5 pr-1 rounded"
+                      }`}
+                    >
+                      <DollarSign className="h-4 w-4 shrink-0 text-emerald-400" />
+                      <span>Payroll Management</span>
+                    </button>
+                    <button
+                      onClick={() => setPayrollExpanded(!payrollExpanded)}
+                      className="p-2 text-slate-400 hover:text-white"
+                      title="Toggle Payroll Submenus"
+                    >
+                      {payrollExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+
+                  {payrollExpanded && (
+                    <div className="space-y-0.5 pl-2 border-l border-white/10 ml-5 my-1">
+                      <button
+                        onClick={() => navigateTo("payroll_dashboard")}
+                        className={subNavItemClass("payroll_dashboard")}
+                      >
+                        Payroll Dashboard
+                      </button>
+                      <button
+                        onClick={() => navigateTo("payroll_config")}
+                        className={subNavItemClass("payroll_config")}
+                      >
+                        Payroll Configuration
+                      </button>
+                      <button
+                        onClick={() => navigateTo("payroll_salary_setup")}
+                        className={subNavItemClass("payroll_salary_setup")}
+                      >
+                        Employee Salary Setup
+                      </button>
+                      <button
+                        onClick={() => navigateTo("payroll_processing")}
+                        className={subNavItemClass("payroll_processing")}
+                      >
+                        Payroll Processing
+                      </button>
+                      <button
+                        onClick={() => navigateTo("payroll_approval")}
+                        className={subNavItemClass("payroll_approval")}
+                      >
+                        Payroll Approval
+                      </button>
+                      <button
+                        onClick={() => navigateTo("payroll_payslips")}
+                        className={subNavItemClass("payroll_payslips")}
+                      >
+                        Payslip Management
+                      </button>
+                      <button
+                        onClick={() => navigateTo("payroll_import")}
+                        className={subNavItemClass("payroll_import")}
+                      >
+                        Payroll CSV Import
+                      </button>
+                      <button
+                        onClick={() => navigateTo("payroll_export")}
+                        className={subNavItemClass("payroll_export")}
+                      >
+                        Payroll CSV Export
+                      </button>
+                      <button
+                        onClick={() => navigateTo("payroll_reports")}
+                        className={subNavItemClass("payroll_reports")}
+                      >
+                        Payroll Reports
+                      </button>
+                      <button
+                        onClick={() => navigateTo("payroll_history")}
+                        className={subNavItemClass("payroll_history")}
+                      >
+                        Payroll History
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -312,6 +436,14 @@ export default function Sidebar({
 
                 {adminExpanded && (
                   <div className="space-y-1 pl-1">
+                    <button
+                      onClick={() => navigateTo("email_settings")}
+                      className={subNavItemClass("email_settings")}
+                    >
+                      <Mail className="h-3.5 w-3.5 shrink-0" />
+                      Email Settings
+                    </button>
+
                     <button
                       onClick={() => navigateTo("users")}
                       className={subNavItemClass("users")}

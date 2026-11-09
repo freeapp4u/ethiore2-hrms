@@ -196,6 +196,30 @@ export interface CompanyProfile {
   description: string;
 }
 
+export interface EmailSettingsConfig {
+  enableEmployeeEmails: boolean;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpSenderEmail: string;
+  smtpSenderName: string;
+  useTlsSsl: boolean;
+  updatedBy?: string;
+  updatedDate?: string;
+}
+
+export interface EmailActivityLog {
+  id: string;
+  recipientEmployeeId?: string;
+  recipientEmail: string;
+  subject: string;
+  sendingModule: string;
+  dateTime: string;
+  deliveryStatus: "Sent" | "Failed" | "Blocked – Email Sending Disabled";
+  failureReason?: string;
+  triggeredBy: string;
+}
+
 export interface CompanyConfig {
   profile: CompanyProfile;
   branding: BrandingConfig;
@@ -203,6 +227,7 @@ export interface CompanyConfig {
   leaveTypesConfig?: LeaveTypeConfig[];
   leaveYearConfig?: LeaveYearConfig;
   medicalPolicyConfig?: MedicalPolicyConfig;
+  emailSettings?: EmailSettingsConfig;
 }
 
 export type RelationshipType = "Spouse" | "Child" | "Parent" | "Dependent" | "Other";
@@ -260,4 +285,205 @@ export interface ActivityLog {
   action: string;
   recordEntity: string;
   details: string;
+}
+
+// ==========================================
+// PAYROLL MANAGEMENT MODULE TYPES
+// ==========================================
+
+export type ComponentType = "Earning" | "Deduction";
+export type CalculationMethod = "Fixed Amount" | "Percentage" | "Formula-Based" | "Based on Basic Salary";
+export type PayrollPeriodStatus = "Open" | "Calculated" | "Submitted" | "Approved" | "Closed" | "Locked";
+export type ApprovalStatus = "Draft" | "Calculated" | "Submitted" | "Approved" | "Rejected" | "Reopened";
+
+export interface SalaryComponent {
+  id: string;
+  name: string; // e.g. "Basic Salary", "Position Allowance", "Transport Allowance"
+  code: string; // e.g. "BS", "PA", "TA", "PIT", "PEN_EE"
+  type: ComponentType;
+  calculationMethod: CalculationMethod;
+  calculationValue: number; // default rate or amount
+  isTaxable: boolean;
+  isPensionable: boolean;
+  taxExemptLimitETB?: number; // max tax exempt portion in ETB
+  effectiveDate: string; // YYYY-MM-DD
+  status: "Active" | "Inactive";
+  description: string;
+  isSystemDefault?: boolean;
+}
+
+export interface TaxBracket {
+  id: string;
+  minIncome: number;
+  maxIncome: number | null; // null for upper threshold (> 10,900 ETB)
+  taxRate: number; // e.g. 0, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35
+  deductionETB: number; // Tax formula deduction offset in ETB
+}
+
+export interface TaxConfiguration {
+  id: string;
+  taxBrackets: TaxBracket[];
+  employeePensionRate: number; // 0.07 (7%)
+  employerPensionRate: number; // 0.11 (11%)
+  transportTaxExemptLimit: number; // 2200 ETB or max threshold
+  effectiveDate: string;
+  status: "Active" | "Historical";
+  updatedBy: string;
+  updatedDate: string;
+}
+
+export interface PayrollPeriod {
+  id: string;
+  periodName: string; // e.g. "January 2026"
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  paymentDate: string; // YYYY-MM-DD
+  status: PayrollPeriodStatus;
+  createdBy: string;
+  createdDate: string;
+  approvedBy?: string;
+  approvedDate?: string;
+  approvalComments?: string;
+}
+
+export interface SalaryRevision {
+  id: string;
+  basicSalary: number;
+  positionAllowance: number;
+  effectiveDate: string;
+  reason: string;
+  updatedBy: string;
+  updatedDate: string;
+}
+
+export interface EmployeeSalaryStructure {
+  id: string;
+  employeeId: string; // references Employee.employeeId
+  basicSalary: number;
+  salaryGrade?: string;
+  positionAllowance: number;
+  transportAllowance: number;
+  housingAllowance: number;
+  responsibilityAllowance: number;
+  telephoneAllowance: number;
+  overtimeAmount: number;
+  otherEarnings: number;
+  recurringDeductions: { [componentCode: string]: number }; // Loan, Other Deductions, etc.
+  isPensionEligible: boolean;
+  effectiveDate: string;
+  updatedBy: string;
+  updatedDate: string;
+  revisionHistory?: SalaryRevision[];
+}
+
+export interface PayrollRecord {
+  id: string;
+  payrollPeriodId: string;
+  payrollPeriodName: string;
+  employeeId: string;
+  employeeName: string;
+  departmentId: string;
+  departmentName: string;
+  position: string;
+  basicSalary: number;
+  positionAllowance: number;
+  transportAllowance: number;
+  housingAllowance: number;
+  responsibilityAllowance: number;
+  telephoneAllowance: number;
+  overtime: number;
+  otherEarnings: number;
+  grossSalary: number;
+  taxableEarnings: number;
+  taxExemptEarnings: number;
+  incomeTax: number;
+  employeePension: number;
+  loanDeduction: number;
+  otherDeductions: number;
+  totalDeductions: number;
+  netSalary: number;
+  employerPension: number; // Calculated separately, NOT deducted from employee net salary
+  status: PayrollPeriodStatus;
+  isImported?: boolean;
+  calculatedDate: string;
+  calculatedBy: string;
+}
+
+export interface Payslip {
+  id: string;
+  payslipRefNo: string;
+  payrollPeriodId: string;
+  payrollPeriodName: string;
+  employeeId: string;
+  employeeName: string;
+  department: string;
+  position: string;
+  paymentDate: string;
+  grossSalary: number;
+  totalDeductions: number;
+  netSalary: number;
+  employerPension: number;
+  earningsBreakdown: { name: string; amount: number }[];
+  deductionsBreakdown: { name: string; amount: number }[];
+  generatedDate: string;
+  generatedBy: string;
+}
+
+export interface PayslipDistributionLog {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  recipientEmail: string;
+  payrollPeriodId: string;
+  payrollPeriodName: string;
+  sendingDate: string;
+  deliveryStatus: "Sent" | "Failed" | "Pending";
+  errorDetails?: string;
+  sentBy: string;
+}
+
+export interface PayrollApproval {
+  id: string;
+  payrollPeriodId: string;
+  periodName: string;
+  submittedBy: string;
+  submittedDate: string;
+  totalEmployees: number;
+  totalGross: number;
+  totalDeductions: number;
+  totalNet: number;
+  totalEmployerPension: number;
+  status: ApprovalStatus;
+  actionBy?: string;
+  actionDate?: string;
+  comments?: string;
+}
+
+export interface PayrollImportError {
+  rowNumber: number;
+  employeeId: string;
+  errorMessage: string;
+}
+
+export interface PayrollImportLog {
+  id: string;
+  filename: string;
+  importMode: "Salary Structure" | "Monthly Payroll";
+  payrollPeriod: string;
+  totalRows: number;
+  successfulRows: number;
+  skippedRows: number;
+  failedRows: number;
+  timestamp: string;
+  importedBy: string;
+  errors: PayrollImportError[];
+}
+
+export interface PayrollSettings {
+  id: string;
+  companyName: string;
+  currency: string;
+  autoEmailPayslipsOnApproval: boolean;
+  updatedBy: string;
+  updatedDate: string;
 }

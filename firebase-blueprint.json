@@ -195,6 +195,185 @@
         "createdDate": { "type": "string", "maxLength": 64 }
       },
       "required": ["id", "employeeId", "employeeName", "beneficiaryType", "beneficiaryName", "relationship", "serviceDescription", "providerName", "expenseDate", "invoiceNumber", "amountETB", "status", "recordedBy", "createdDate"]
+    },
+    "SalaryComponent": {
+      "title": "SalaryComponent",
+      "description": "Configurable salary earnings and deductions components.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 256 },
+        "code": { "type": "string", "maxLength": 64 },
+        "type": { "type": "string", "enum": ["Earning", "Deduction"] },
+        "calculationMethod": { "type": "string", "enum": ["Fixed Amount", "Percentage", "Formula-Based", "Based on Basic Salary"] },
+        "calculationValue": { "type": "number" },
+        "isTaxable": { "type": "boolean" },
+        "isPensionable": { "type": "boolean" },
+        "effectiveDate": { "type": "string", "maxLength": 16 },
+        "status": { "type": "string", "enum": ["Active", "Inactive"] },
+        "description": { "type": "string", "maxLength": 512 }
+      },
+      "required": ["id", "name", "code", "type", "calculationMethod", "calculationValue", "isTaxable", "isPensionable", "effectiveDate", "status", "description"]
+    },
+    "TaxConfiguration": {
+      "title": "TaxConfiguration",
+      "description": "Ethiopian progressive income tax brackets and statutory pension rules.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "employeePensionRate": { "type": "number" },
+        "employerPensionRate": { "type": "number" },
+        "transportTaxExemptLimit": { "type": "number" },
+        "effectiveDate": { "type": "string", "maxLength": 16 },
+        "status": { "type": "string", "enum": ["Active", "Historical"] },
+        "updatedBy": { "type": "string", "maxLength": 256 },
+        "updatedDate": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "employeePensionRate", "employerPensionRate", "effectiveDate", "status", "updatedBy", "updatedDate"]
+    },
+    "PayrollPeriod": {
+      "title": "PayrollPeriod",
+      "description": "Monthly payroll period configuration and lock status.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "periodName": { "type": "string", "maxLength": 128 },
+        "startDate": { "type": "string", "maxLength": 16 },
+        "endDate": { "type": "string", "maxLength": 16 },
+        "paymentDate": { "type": "string", "maxLength": 16 },
+        "status": { "type": "string", "enum": ["Open", "Calculated", "Submitted", "Approved", "Closed", "Locked"] },
+        "createdBy": { "type": "string", "maxLength": 256 },
+        "createdDate": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "periodName", "startDate", "endDate", "paymentDate", "status", "createdBy", "createdDate"]
+    },
+    "EmployeeSalaryStructure": {
+      "title": "EmployeeSalaryStructure",
+      "description": "Employee basic salary, allowances, and recurring deductions setup.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "employeeId": { "type": "string", "maxLength": 128 },
+        "basicSalary": { "type": "number" },
+        "positionAllowance": { "type": "number" },
+        "transportAllowance": { "type": "number" },
+        "housingAllowance": { "type": "number" },
+        "responsibilityAllowance": { "type": "number" },
+        "telephoneAllowance": { "type": "number" },
+        "overtimeAmount": { "type": "number" },
+        "otherEarnings": { "type": "number" },
+        "isPensionEligible": { "type": "boolean" },
+        "effectiveDate": { "type": "string", "maxLength": 16 },
+        "updatedBy": { "type": "string", "maxLength": 256 },
+        "updatedDate": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "employeeId", "basicSalary", "positionAllowance", "transportAllowance", "housingAllowance", "isPensionEligible", "effectiveDate", "updatedBy", "updatedDate"]
+    },
+    "PayrollRecord": {
+      "title": "PayrollRecord",
+      "description": "Calculated or imported monthly salary record per employee.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "payrollPeriodId": { "type": "string", "maxLength": 128 },
+        "payrollPeriodName": { "type": "string", "maxLength": 128 },
+        "employeeId": { "type": "string", "maxLength": 128 },
+        "employeeName": { "type": "string", "maxLength": 256 },
+        "departmentId": { "type": "string", "maxLength": 128 },
+        "basicSalary": { "type": "number" },
+        "grossSalary": { "type": "number" },
+        "incomeTax": { "type": "number" },
+        "employeePension": { "type": "number" },
+        "totalDeductions": { "type": "number" },
+        "netSalary": { "type": "number" },
+        "employerPension": { "type": "number" },
+        "status": { "type": "string", "enum": ["Open", "Calculated", "Submitted", "Approved", "Closed", "Locked"] },
+        "calculatedDate": { "type": "string", "maxLength": 64 },
+        "calculatedBy": { "type": "string", "maxLength": 256 }
+      },
+      "required": ["id", "payrollPeriodId", "payrollPeriodName", "employeeId", "employeeName", "departmentId", "basicSalary", "grossSalary", "incomeTax", "employeePension", "totalDeductions", "netSalary", "employerPension", "status", "calculatedDate", "calculatedBy"]
+    },
+    "Payslip": {
+      "title": "Payslip",
+      "description": "Individual monthly payslip document.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "payslipRefNo": { "type": "string", "maxLength": 128 },
+        "payrollPeriodId": { "type": "string", "maxLength": 128 },
+        "employeeId": { "type": "string", "maxLength": 128 },
+        "employeeName": { "type": "string", "maxLength": 256 },
+        "grossSalary": { "type": "number" },
+        "totalDeductions": { "type": "number" },
+        "netSalary": { "type": "number" },
+        "employerPension": { "type": "number" },
+        "generatedDate": { "type": "string", "maxLength": 64 },
+        "generatedBy": { "type": "string", "maxLength": 256 }
+      },
+      "required": ["id", "payslipRefNo", "payrollPeriodId", "employeeId", "employeeName", "grossSalary", "totalDeductions", "netSalary", "employerPension", "generatedDate", "generatedBy"]
+    },
+    "PayslipDistributionLog": {
+      "title": "PayslipDistributionLog",
+      "description": "Email sending log for payslip distribution.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "employeeId": { "type": "string", "maxLength": 128 },
+        "recipientEmail": { "type": "string", "maxLength": 256 },
+        "payrollPeriodId": { "type": "string", "maxLength": 128 },
+        "sendingDate": { "type": "string", "maxLength": 64 },
+        "deliveryStatus": { "type": "string", "enum": ["Sent", "Failed", "Pending"] },
+        "sentBy": { "type": "string", "maxLength": 256 }
+      },
+      "required": ["id", "employeeId", "recipientEmail", "payrollPeriodId", "sendingDate", "deliveryStatus", "sentBy"]
+    },
+    "PayrollApproval": {
+      "title": "PayrollApproval",
+      "description": "Monthly payroll approval submission and verification record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "payrollPeriodId": { "type": "string", "maxLength": 128 },
+        "periodName": { "type": "string", "maxLength": 128 },
+        "submittedBy": { "type": "string", "maxLength": 256 },
+        "submittedDate": { "type": "string", "maxLength": 64 },
+        "totalEmployees": { "type": "number" },
+        "totalGross": { "type": "number" },
+        "totalNet": { "type": "number" },
+        "status": { "type": "string", "enum": ["Draft", "Calculated", "Submitted", "Approved", "Rejected", "Reopened"] }
+      },
+      "required": ["id", "payrollPeriodId", "periodName", "submittedBy", "submittedDate", "totalEmployees", "totalGross", "totalNet", "status"]
+    },
+    "PayrollImportLog": {
+      "title": "PayrollImportLog",
+      "description": "Audit record of CSV import runs.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "filename": { "type": "string", "maxLength": 256 },
+        "importMode": { "type": "string", "enum": ["Salary Structure", "Monthly Payroll"] },
+        "payrollPeriod": { "type": "string", "maxLength": 128 },
+        "totalRows": { "type": "number" },
+        "successfulRows": { "type": "number" },
+        "failedRows": { "type": "number" },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "importedBy": { "type": "string", "maxLength": 256 }
+      },
+      "required": ["id", "filename", "importMode", "payrollPeriod", "totalRows", "successfulRows", "failedRows", "timestamp", "importedBy"]
+    },
+    "PayrollSettings": {
+      "title": "PayrollSettings",
+      "description": "General payroll configurations.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "companyName": { "type": "string", "maxLength": 256 },
+        "currency": { "type": "string", "maxLength": 32 },
+        "autoEmailPayslipsOnApproval": { "type": "boolean" },
+        "updatedBy": { "type": "string", "maxLength": 256 },
+        "updatedDate": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "companyName", "currency", "autoEmailPayslipsOnApproval", "updatedBy", "updatedDate"]
     }
   },
   "firestore": {
@@ -237,6 +416,50 @@
     "medical_expenses": {
       "schema": "MedicalExpense",
       "description": "Medical expense claims registry"
+    },
+    "salary_components": {
+      "schema": "SalaryComponent",
+      "description": "Earnings and deductions salary components"
+    },
+    "tax_configurations": {
+      "schema": "TaxConfiguration",
+      "description": "Progressive tax brackets and pension rates"
+    },
+    "payroll_periods": {
+      "schema": "PayrollPeriod",
+      "description": "Monthly payroll processing periods"
+    },
+    "employee_salary_structures": {
+      "schema": "EmployeeSalaryStructure",
+      "description": "Employee base salary and allowances setup"
+    },
+    "payroll_records": {
+      "schema": "PayrollRecord",
+      "description": "Monthly payroll ledger calculations"
+    },
+    "payslips": {
+      "schema": "Payslip",
+      "description": "Employee monthly payslips"
+    },
+    "payslip_distribution_logs": {
+      "schema": "PayslipDistributionLog",
+      "description": "Email delivery logs for payslips"
+    },
+    "payroll_approvals": {
+      "schema": "PayrollApproval",
+      "description": "Payroll verification and approval workflow tracking"
+    },
+    "payroll_import_logs": {
+      "schema": "PayrollImportLog",
+      "description": "CSV import audit log records"
+    },
+    "payroll_settings": {
+      "schema": "PayrollSettings",
+      "description": "General payroll module settings"
+    },
+    "email_logs": {
+      "schema": "EmailActivityLog",
+      "description": "Central system email delivery and blocked status audit logs"
     }
   }
 }

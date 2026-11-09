@@ -1,12 +1,20 @@
 import { 
   User, Department, Employee, AttendanceRecord, LeaveRecord, 
-  PublicHoliday, CompanyConfig, ActivityLog, UserRole, FamilyMember, MedicalExpense
+  PublicHoliday, CompanyConfig, ActivityLog, FamilyMember, MedicalExpense,
+  SalaryComponent, TaxConfiguration, PayrollPeriod, EmployeeSalaryStructure,
+  PayrollRecord, Payslip, PayslipDistributionLog, PayrollApproval, PayrollImportLog, PayrollSettings,
+  EmailActivityLog
 } from "./types";
 import { 
   DEFAULT_USERS, DEFAULT_DEPARTMENTS, DEFAULT_EMPLOYEES, 
   DEFAULT_HOLIDAYS, DEFAULT_ATTENDANCE, DEFAULT_LEAVES, 
-  DEFAULT_COMPANY_CONFIG, DEFAULT_ACTIVITY_LOGS, DEFAULT_FAMILY_MEMBERS, DEFAULT_MEDICAL_EXPENSES 
+  DEFAULT_COMPANY_CONFIG, DEFAULT_ACTIVITY_LOGS, DEFAULT_FAMILY_MEMBERS, DEFAULT_MEDICAL_EXPENSES,
+  DEFAULT_SALARY_COMPONENTS, DEFAULT_PAYROLL_PERIODS, DEFAULT_EMPLOYEE_SALARY_STRUCTURES,
+  DEFAULT_PAYROLL_RECORDS, DEFAULT_PAYROLL_APPROVALS, DEFAULT_PAYSLIPS,
+  DEFAULT_PAYSLIP_DISTRIBUTION_LOGS, DEFAULT_PAYROLL_IMPORT_LOGS, DEFAULT_PAYROLL_SETTINGS,
+  DEFAULT_EMAIL_LOGS
 } from "./initialData";
+import { DEFAULT_TAX_CONFIG } from "./utils/payrollUtils";
 
 const STORAGE_KEYS = {
   USERS: "ethiore_users",
@@ -19,7 +27,19 @@ const STORAGE_KEYS = {
   MEDICAL_EXPENSES: "ethiore_medical_expenses",
   CONFIG: "ethiore_company_config",
   LOGS: "ethiore_activity_logs",
-  CURRENT_USER: "ethiore_current_user"
+  CURRENT_USER: "ethiore_current_user",
+  EMAIL_LOGS: "ethiore_email_logs",
+  // PAYROLL STORAGE KEYS
+  SALARY_COMPONENTS: "ethiore_salary_components",
+  TAX_CONFIG: "ethiore_tax_config",
+  PAYROLL_PERIODS: "ethiore_payroll_periods",
+  SALARY_STRUCTURES: "ethiore_employee_salary_structures",
+  PAYROLL_RECORDS: "ethiore_payroll_records",
+  PAYSLIPS: "ethiore_payslips",
+  PAYSLIP_DISTRIBUTION_LOGS: "ethiore_payslip_distribution_logs",
+  PAYROLL_APPROVALS: "ethiore_payroll_approvals",
+  PAYROLL_IMPORT_LOGS: "ethiore_payroll_import_logs",
+  PAYROLL_SETTINGS: "ethiore_payroll_settings"
 };
 
 export interface AppState {
@@ -34,6 +54,18 @@ export interface AppState {
   config: CompanyConfig;
   logs: ActivityLog[];
   currentUser: User | null;
+  emailLogs: EmailActivityLog[];
+  // Payroll State
+  salaryComponents: SalaryComponent[];
+  taxConfig: TaxConfiguration;
+  payrollPeriods: PayrollPeriod[];
+  salaryStructures: EmployeeSalaryStructure[];
+  payrollRecords: PayrollRecord[];
+  payslips: Payslip[];
+  payslipDistributionLogs: PayslipDistributionLog[];
+  payrollApprovals: PayrollApproval[];
+  payrollImportLogs: PayrollImportLog[];
+  payrollSettings: PayrollSettings;
 }
 
 export function loadState(): AppState {
@@ -90,7 +122,19 @@ export function loadState(): AppState {
     medicalExpenses: cleanMedicalExpenses,
     config: getOrSeed<CompanyConfig>(STORAGE_KEYS.CONFIG, DEFAULT_COMPANY_CONFIG),
     logs: cleanLogs,
-    currentUser: getOrSeed<User | null>(STORAGE_KEYS.CURRENT_USER, null)
+    currentUser: getOrSeed<User | null>(STORAGE_KEYS.CURRENT_USER, null),
+    emailLogs: getOrSeed<EmailActivityLog[]>(STORAGE_KEYS.EMAIL_LOGS, DEFAULT_EMAIL_LOGS),
+    // Payroll State Load
+    salaryComponents: getOrSeed<SalaryComponent[]>(STORAGE_KEYS.SALARY_COMPONENTS, DEFAULT_SALARY_COMPONENTS),
+    taxConfig: getOrSeed<TaxConfiguration>(STORAGE_KEYS.TAX_CONFIG, DEFAULT_TAX_CONFIG),
+    payrollPeriods: getOrSeed<PayrollPeriod[]>(STORAGE_KEYS.PAYROLL_PERIODS, DEFAULT_PAYROLL_PERIODS),
+    salaryStructures: getOrSeed<EmployeeSalaryStructure[]>(STORAGE_KEYS.SALARY_STRUCTURES, DEFAULT_EMPLOYEE_SALARY_STRUCTURES),
+    payrollRecords: getOrSeed<PayrollRecord[]>(STORAGE_KEYS.PAYROLL_RECORDS, DEFAULT_PAYROLL_RECORDS),
+    payslips: getOrSeed<Payslip[]>(STORAGE_KEYS.PAYSLIPS, DEFAULT_PAYSLIPS),
+    payslipDistributionLogs: getOrSeed<PayslipDistributionLog[]>(STORAGE_KEYS.PAYSLIP_DISTRIBUTION_LOGS, DEFAULT_PAYSLIP_DISTRIBUTION_LOGS),
+    payrollApprovals: getOrSeed<PayrollApproval[]>(STORAGE_KEYS.PAYROLL_APPROVALS, DEFAULT_PAYROLL_APPROVALS),
+    payrollImportLogs: getOrSeed<PayrollImportLog[]>(STORAGE_KEYS.PAYROLL_IMPORT_LOGS, DEFAULT_PAYROLL_IMPORT_LOGS),
+    payrollSettings: getOrSeed<PayrollSettings>(STORAGE_KEYS.PAYROLL_SETTINGS, DEFAULT_PAYROLL_SETTINGS)
   };
 }
 
@@ -106,6 +150,19 @@ export function saveState(state: Partial<AppState>) {
   if (state.config !== undefined) localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(state.config));
   if (state.logs !== undefined) localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(state.logs));
   if (state.currentUser !== undefined) localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(state.currentUser));
+  if (state.emailLogs !== undefined) localStorage.setItem(STORAGE_KEYS.EMAIL_LOGS, JSON.stringify(state.emailLogs));
+
+  // Payroll save
+  if (state.salaryComponents !== undefined) localStorage.setItem(STORAGE_KEYS.SALARY_COMPONENTS, JSON.stringify(state.salaryComponents));
+  if (state.taxConfig !== undefined) localStorage.setItem(STORAGE_KEYS.TAX_CONFIG, JSON.stringify(state.taxConfig));
+  if (state.payrollPeriods !== undefined) localStorage.setItem(STORAGE_KEYS.PAYROLL_PERIODS, JSON.stringify(state.payrollPeriods));
+  if (state.salaryStructures !== undefined) localStorage.setItem(STORAGE_KEYS.SALARY_STRUCTURES, JSON.stringify(state.salaryStructures));
+  if (state.payrollRecords !== undefined) localStorage.setItem(STORAGE_KEYS.PAYROLL_RECORDS, JSON.stringify(state.payrollRecords));
+  if (state.payslips !== undefined) localStorage.setItem(STORAGE_KEYS.PAYSLIPS, JSON.stringify(state.payslips));
+  if (state.payslipDistributionLogs !== undefined) localStorage.setItem(STORAGE_KEYS.PAYSLIP_DISTRIBUTION_LOGS, JSON.stringify(state.payslipDistributionLogs));
+  if (state.payrollApprovals !== undefined) localStorage.setItem(STORAGE_KEYS.PAYROLL_APPROVALS, JSON.stringify(state.payrollApprovals));
+  if (state.payrollImportLogs !== undefined) localStorage.setItem(STORAGE_KEYS.PAYROLL_IMPORT_LOGS, JSON.stringify(state.payrollImportLogs));
+  if (state.payrollSettings !== undefined) localStorage.setItem(STORAGE_KEYS.PAYROLL_SETTINGS, JSON.stringify(state.payrollSettings));
 }
 
 // Global logger helper

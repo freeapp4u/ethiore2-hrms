@@ -13,7 +13,10 @@ import {
 import { 
   User, Department, Employee, AttendanceRecord, LeaveRecord, 
   PublicHoliday, CompanyConfig, ActivityLog, UserRole, AccountStatus,
-  FamilyMember, MedicalExpense
+  FamilyMember, MedicalExpense,
+  SalaryComponent, TaxConfiguration, PayrollPeriod, EmployeeSalaryStructure,
+  PayrollRecord, Payslip, PayslipDistributionLog, PayrollApproval, PayrollImportLog, PayrollSettings,
+  EmailActivityLog
 } from "./types";
 
 // Component Imports
@@ -26,6 +29,7 @@ import Departments from "./components/Departments";
 import Attendance from "./components/Attendance";
 import LeaveManagement from "./components/LeaveManagement";
 import MedicalManagement from "./components/MedicalManagement";
+import PayrollManagement from "./components/PayrollManagement";
 import Settings from "./components/Settings";
 import Reports from "./components/Reports";
 import HelpCenter from "./components/HelpCenter";
@@ -46,11 +50,45 @@ export default function App() {
   const [medicalExpenses, setMedicalExpenses] = useState<MedicalExpense[]>([]);
   const [config, setConfig] = useState<CompanyConfig | null>(null);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [emailLogs, setEmailLogs] = useState<EmailActivityLog[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
+  // Payroll Management State
+  const [salaryComponents, setSalaryComponents] = useState<SalaryComponent[]>([]);
+  const [taxConfig, setTaxConfig] = useState<TaxConfiguration | null>(null);
+  const [payrollPeriods, setPayrollPeriods] = useState<PayrollPeriod[]>([]);
+  const [salaryStructures, setSalaryStructures] = useState<EmployeeSalaryStructure[]>([]);
+  const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
+  const [payslips, setPayslips] = useState<Payslip[]>([]);
+  const [payslipDistributionLogs, setPayslipDistributionLogs] = useState<PayslipDistributionLog[]>([]);
+  const [payrollApprovals, setPayrollApprovals] = useState<PayrollApproval[]>([]);
+  const [payrollImportLogs, setPayrollImportLogs] = useState<PayrollImportLog[]>([]);
+  const [payrollSettings, setPayrollSettings] = useState<PayrollSettings | null>(null);
+
   // Layout UI states
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTabState] = useState(() => {
+    const hash = window.location.hash.replace("#", "");
+    return hash || "dashboard";
+  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const setActiveTab = (tabId: string) => {
+    setActiveTabState(tabId);
+    if (window.location.hash !== `#${tabId}`) {
+      window.location.hash = tabId;
+    }
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (hash && hash !== activeTab) {
+        setActiveTabState(hash);
+      }
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, [activeTab]);
 
   // Login form states
   const [loginEmail, setLoginEmail] = useState("");
@@ -90,7 +128,21 @@ export default function App() {
     setMedicalExpenses(state.medicalExpenses || []);
     setConfig(state.config);
     setLogs(state.logs);
+    setEmailLogs(state.emailLogs || []);
     setCurrentUser(state.currentUser);
+
+    // Load payroll state
+    setSalaryComponents(state.salaryComponents || []);
+    setTaxConfig(state.taxConfig || null);
+    setPayrollPeriods(state.payrollPeriods || []);
+    setSalaryStructures(state.salaryStructures || []);
+    setPayrollRecords(state.payrollRecords || []);
+    setPayslips(state.payslips || []);
+    setPayslipDistributionLogs(state.payslipDistributionLogs || []);
+    setPayrollApprovals(state.payrollApprovals || []);
+    setPayrollImportLogs(state.payrollImportLogs || []);
+    setPayrollSettings(state.payrollSettings || null);
+
     setLoading(false);
   }, []);
 
@@ -154,9 +206,78 @@ export default function App() {
     }
   };
 
+  const handleUpdateEmailLogs = (newLogs: EmailActivityLog[]) => {
+    setEmailLogs(newLogs);
+    saveState({ emailLogs: newLogs });
+    if (newLogs.length > 0) {
+      syncRecordToFirestore("email_logs", newLogs[0].id, newLogs[0]);
+    }
+  };
+
   const handleUpdateCurrentUser = (user: User | null) => {
     setCurrentUser(user);
     saveState({ currentUser: user });
+  };
+
+  // Payroll State Update Handlers
+  const handleUpdateSalaryComponents = (newComponents: SalaryComponent[]) => {
+    setSalaryComponents(newComponents);
+    saveState({ salaryComponents: newComponents });
+    newComponents.forEach(c => syncRecordToFirestore("salary_components", c.id, c));
+  };
+
+  const handleUpdateTaxConfig = (newTaxConfig: TaxConfiguration) => {
+    setTaxConfig(newTaxConfig);
+    saveState({ taxConfig: newTaxConfig });
+    syncRecordToFirestore("tax_configurations", newTaxConfig.id, newTaxConfig);
+  };
+
+  const handleUpdatePayrollPeriods = (newPeriods: PayrollPeriod[]) => {
+    setPayrollPeriods(newPeriods);
+    saveState({ payrollPeriods: newPeriods });
+    newPeriods.forEach(p => syncRecordToFirestore("payroll_periods", p.id, p));
+  };
+
+  const handleUpdateSalaryStructures = (newStructures: EmployeeSalaryStructure[]) => {
+    setSalaryStructures(newStructures);
+    saveState({ salaryStructures: newStructures });
+    newStructures.forEach(s => syncRecordToFirestore("employee_salary_structures", s.id, s));
+  };
+
+  const handleUpdatePayrollRecords = (newRecords: PayrollRecord[]) => {
+    setPayrollRecords(newRecords);
+    saveState({ payrollRecords: newRecords });
+    newRecords.forEach(r => syncRecordToFirestore("payroll_records", r.id, r));
+  };
+
+  const handleUpdatePayslips = (newPayslips: Payslip[]) => {
+    setPayslips(newPayslips);
+    saveState({ payslips: newPayslips });
+    newPayslips.forEach(ps => syncRecordToFirestore("payslips", ps.id, ps));
+  };
+
+  const handleUpdatePayslipDistributionLogs = (newLogs: PayslipDistributionLog[]) => {
+    setPayslipDistributionLogs(newLogs);
+    saveState({ payslipDistributionLogs: newLogs });
+    newLogs.forEach(l => syncRecordToFirestore("payslip_distribution_logs", l.id, l));
+  };
+
+  const handleUpdatePayrollApprovals = (newApprovals: PayrollApproval[]) => {
+    setPayrollApprovals(newApprovals);
+    saveState({ payrollApprovals: newApprovals });
+    newApprovals.forEach(a => syncRecordToFirestore("payroll_approvals", a.id, a));
+  };
+
+  const handleUpdatePayrollImportLogs = (newLogs: PayrollImportLog[]) => {
+    setPayrollImportLogs(newLogs);
+    saveState({ payrollImportLogs: newLogs });
+    newLogs.forEach(l => syncRecordToFirestore("payroll_import_logs", l.id, l));
+  };
+
+  const handleUpdatePayrollSettings = (newSettings: PayrollSettings) => {
+    setPayrollSettings(newSettings);
+    saveState({ payrollSettings: newSettings });
+    syncRecordToFirestore("payroll_settings", newSettings.id, newSettings);
   };
 
   // Transaction auditing action logger
@@ -172,7 +293,18 @@ export default function App() {
       medicalExpenses,
       config: config!,
       logs,
-      currentUser
+      currentUser,
+      emailLogs,
+      salaryComponents,
+      taxConfig: taxConfig || undefined,
+      payrollPeriods,
+      salaryStructures,
+      payrollRecords,
+      payslips,
+      payslipDistributionLogs,
+      payrollApprovals,
+      payrollImportLogs,
+      payrollSettings: payrollSettings || undefined,
     };
     const updatedLogs = logActivity(currentState, module, action, record, details);
     setLogs(updatedLogs);
@@ -251,7 +383,18 @@ export default function App() {
       medicalExpenses,
       config: config!,
       logs,
-      currentUser: updatedUser
+      currentUser: updatedUser,
+      emailLogs,
+      salaryComponents,
+      taxConfig: taxConfig || undefined,
+      payrollPeriods,
+      salaryStructures,
+      payrollRecords,
+      payslips,
+      payslipDistributionLogs,
+      payrollApprovals,
+      payrollImportLogs,
+      payrollSettings: payrollSettings || undefined,
     };
     const updatedLogs = logActivity(currentState, "Security", "Operator Login", emailNorm, `Operator logged in from portal IP`);
     setLogs(updatedLogs);
@@ -968,6 +1111,43 @@ export default function App() {
             />
           )}
 
+          {(activeTab === "payroll" || activeTab.startsWith("payroll")) && (
+            <PayrollManagement
+              employees={employees}
+              departments={departments}
+              currentUser={currentUser}
+              companyConfig={config}
+              salaryComponents={salaryComponents}
+              taxConfig={taxConfig}
+              payrollPeriods={payrollPeriods}
+              salaryStructures={salaryStructures}
+              payrollRecords={payrollRecords}
+              payslips={payslips}
+              payslipDistributionLogs={payslipDistributionLogs}
+              payrollApprovals={payrollApprovals}
+              payrollImportLogs={payrollImportLogs}
+              payrollSettings={payrollSettings}
+              initialSubTab={
+                activeTab.startsWith("payroll_")
+                  ? (activeTab.replace("payroll_", "") === "import" ? "csv_import" : activeTab.replace("payroll_", "") === "export" ? "csv_export" : activeTab.replace("payroll_", ""))
+                  : "dashboard"
+              }
+              emailLogs={emailLogs}
+              onUpdateComponents={handleUpdateSalaryComponents}
+              onUpdateTaxConfig={handleUpdateTaxConfig}
+              onUpdatePeriods={handleUpdatePayrollPeriods}
+              onUpdateStructures={handleUpdateSalaryStructures}
+              onUpdateRecords={handleUpdatePayrollRecords}
+              onUpdatePayslips={handleUpdatePayslips}
+              onUpdateDistributionLogs={handleUpdatePayslipDistributionLogs}
+              onUpdateApprovals={handleUpdatePayrollApprovals}
+              onUpdateImportLogs={handleUpdatePayrollImportLogs}
+              onUpdateSettings={handleUpdatePayrollSettings}
+              onUpdateEmailLogs={handleUpdateEmailLogs}
+              onLogAction={handleLogAction}
+            />
+          )}
+
           {/* Map sidebar settings direct nodes to setting panels */}
           {activeTab.startsWith("settings_") && (
             <Settings
@@ -975,11 +1155,13 @@ export default function App() {
               users={users}
               employees={employees}
               holidays={holidays}
+              emailLogs={emailLogs}
               currentUser={currentUser}
-              initialSubTab={activeTab.split("_")[1]}
+              initialSubTab={activeTab.substring(activeTab.indexOf("_") + 1)}
               onUpdateConfig={handleUpdateConfig}
               onUpdateUsers={handleUpdateUsers}
               onUpdateHolidays={handleUpdateHolidays}
+              onUpdateEmailLogs={handleUpdateEmailLogs}
               onLogAction={handleLogAction}
             />
           )}
