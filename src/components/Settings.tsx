@@ -97,7 +97,7 @@ export default function Settings({
     smtpSenderEmail: "noreply@ethiopianre.com",
     smtpSenderName: "Ethiopian Reinsurance HRMS",
     useTlsSsl: true,
-    updatedBy: "admin@ethio-re.com",
+    updatedBy: "contactesfaye@gmail.com",
     updatedDate: "2026-01-01"
   };
 

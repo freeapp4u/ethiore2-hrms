@@ -237,9 +237,9 @@ export default function Employees({
       status: empStatus,
       category: category.trim(),
       createdDate: new Date().toISOString().replace("T", " ").substring(0, 19),
-      createdBy: currentUser?.email || "hr@ethio-re.com",
+      createdBy: currentUser?.email || "system@ethiopianre.com",
       updatedDate: new Date().toISOString().replace("T", " ").substring(0, 19),
-      updatedBy: currentUser?.email || "hr@ethio-re.com"
+      updatedBy: currentUser?.email || "system@ethiopianre.com"
     };
 
     const success = onAddEmployee(newEmp);
@@ -291,7 +291,7 @@ export default function Employees({
       status: empStatus,
       category: category.trim(),
       updatedDate: new Date().toISOString().replace("T", " ").substring(0, 19),
-      updatedBy: currentUser?.email || "hr@ethio-re.com"
+      updatedBy: currentUser?.email || "system@ethiopianre.com"
     };
 
     onUpdateEmployee(updatedEmp);
@@ -313,7 +313,7 @@ export default function Employees({
       ...emp,
       status: nextStatus,
       updatedDate: new Date().toISOString().replace("T", " ").substring(0, 19),
-      updatedBy: currentUser?.email || "hr@ethio-re.com"
+      updatedBy: currentUser?.email || "system@ethiopianre.com"
     };
     onUpdateEmployee(updated);
     onLogAction(
@@ -504,9 +504,9 @@ export default function Employees({
             status: statusVal,
             category: salaryInput ? `Salary: ETB ${Number(salaryInput).toLocaleString()}` : "",
             createdDate: new Date().toISOString().replace("T", " ").substring(0, 19),
-            createdBy: currentUser?.email || "hr@ethio-re.com",
+            createdBy: currentUser?.email || "system@ethiopianre.com",
             updatedDate: new Date().toISOString().replace("T", " ").substring(0, 19),
-            updatedBy: currentUser?.email || "hr@ethio-re.com"
+            updatedBy: currentUser?.email || "system@ethiopianre.com"
           };
         }
 

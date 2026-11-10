@@ -299,7 +299,7 @@ export default function LeaveManagement({
       status: "Active",
       remarks,
       supportingDocumentUrl: docUrl.trim() || undefined,
-      recordedBy: currentUser?.email || "hr@ethio-re.com",
+      recordedBy: currentUser?.email || "system@ethiopianre.com",
       createdDate: new Date().toISOString().replace("T", " ").substring(0, 19),
       updatedDate: new Date().toISOString().replace("T", " ").substring(0, 19)
     };
@@ -435,7 +435,7 @@ export default function LeaveManagement({
       previousRemaining: prevRem,
       newRemaining: newRem,
       reason: adjReason.trim(),
-      performedBy: currentUser?.email || "hr@ethio-re.com",
+      performedBy: currentUser?.email || "system@ethiopianre.com",
       timestamp: new Date().toISOString().replace("T", " ").substring(0, 19)
     };
 
@@ -649,7 +649,7 @@ export default function LeaveManagement({
       fromYear: yeFromYear,
       toYear: yeToYear,
       processedDate: new Date().toISOString().replace("T", " ").substring(0, 19),
-      processedBy: currentUser?.email || "admin@ethio-re.com",
+      processedBy: currentUser?.email || "contactesfaye@gmail.com",
       totalEmployeesProcessed: activeEmployees.length,
       totalCarriedForwardDays: yearEndPreview.totalCarried,
       totalExpiredDays: yearEndPreview.totalExpired,
@@ -667,7 +667,7 @@ export default function LeaveManagement({
         yearName: yeToYear,
         processedYearEnd: true,
         processedDate: new Date().toISOString().replace("T", " ").substring(0, 19),
-        processedBy: currentUser?.email || "admin@ethio-re.com"
+        processedBy: currentUser?.email || "contactesfaye@gmail.com"
       }
     });
 

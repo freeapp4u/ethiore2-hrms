@@ -8,7 +8,8 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut, 
-  sendEmailVerification 
+  sendEmailVerification,
+  sendPasswordResetEmail 
 } from "./firebase";
 import { 
   User, Department, Employee, AttendanceRecord, LeaveRecord, 
@@ -35,7 +36,7 @@ import Reports from "./components/Reports";
 import HelpCenter from "./components/HelpCenter";
 import DocumentVault from "./components/DocumentVault";
 
-import { ShieldCheck, Lock, Mail, ServerCrash, Key, Eye, EyeOff } from "lucide-react";
+import { ShieldCheck, Lock, Mail, ServerCrash, Key, Eye, EyeOff, X, Users } from "lucide-react";
 
 export default function App() {
   // Core App state variables
@@ -93,7 +94,16 @@ export default function App() {
   // Login form states
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
+
+  // Forgot Password modal states
+  const [forgotPasswordModal, setForgotPasswordModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetStatus, setResetStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
 
   // Login / Register view toggle state
   const [loginMode, setLoginMode] = useState<"login" | "register">("login");
@@ -316,7 +326,7 @@ export default function App() {
     setLoginError("");
 
     if (!loginEmail.trim() || !loginPassword) {
-      setLoginError("Please type both your Email and Password.");
+      setLoginError("Please enter both your company email address and password.");
       return;
     }
 
@@ -324,7 +334,7 @@ export default function App() {
     const foundUser = users.find(u => u.email.toLowerCase() === emailNorm);
 
     if (!foundUser) {
-      setLoginError("Unauthorized credentials: Operator account does not exist.");
+      setLoginError("Unauthorized credentials: No registered account found with this email address.");
       return;
     }
 
@@ -345,62 +355,94 @@ export default function App() {
       return;
     }
 
-    // Establish Firebase Auth session
+    setLoginLoading(true);
+
     try {
-      await signInWithEmailAndPassword(auth, emailNorm, loginPassword);
-    } catch (authErr: any) {
-      if (authErr?.code === "auth/user-not-found" || authErr?.code === "auth/invalid-credential") {
-        try {
-          await createUserWithEmailAndPassword(auth, emailNorm, loginPassword);
-        } catch (createErr) {
-          console.warn("Firebase Auth seed notice:", createErr);
+      // Establish Firebase Auth session
+      try {
+        await signInWithEmailAndPassword(auth, emailNorm, loginPassword);
+      } catch (authErr: any) {
+        if (authErr?.code === "auth/user-not-found" || authErr?.code === "auth/invalid-credential") {
+          try {
+            await createUserWithEmailAndPassword(auth, emailNorm, loginPassword);
+          } catch (createErr) {
+            console.warn("Firebase Auth seed notice:", createErr);
+          }
+        } else {
+          console.warn("Firebase Auth sign in notice:", authErr);
         }
-      } else {
-        console.warn("Firebase Auth sign in notice:", authErr);
       }
+
+      // Success login
+      const updatedUser = {
+        ...foundUser,
+        lastLogin: new Date().toISOString().replace("T", " ").substring(0, 19)
+      };
+
+      // Update users array with last login time
+      const updatedUsers = users.map(u => u.id === foundUser.id ? updatedUser : u);
+      handleUpdateUsers(updatedUsers, updatedUser);
+      handleUpdateCurrentUser(updatedUser);
+
+      // Initial log
+      const currentState: AppState = {
+        users: updatedUsers,
+        departments,
+        employees,
+        holidays,
+        attendance,
+        leaves,
+        familyMembers,
+        medicalExpenses,
+        config: config!,
+        logs,
+        currentUser: updatedUser,
+        emailLogs,
+        salaryComponents,
+        taxConfig: taxConfig || undefined,
+        payrollPeriods,
+        salaryStructures,
+        payrollRecords,
+        payslips,
+        payslipDistributionLogs,
+        payrollApprovals,
+        payrollImportLogs,
+        payrollSettings: payrollSettings || undefined,
+      };
+      const updatedLogs = logActivity(currentState, "Security", "Operator Login", emailNorm, `Operator logged in from portal IP`);
+      setLogs(updatedLogs);
+
+      setLoginEmail("");
+      setLoginPassword("");
+    } finally {
+      setLoginLoading(false);
     }
+  };
 
-    // Success login
-    const updatedUser = {
-      ...foundUser,
-      lastLogin: new Date().toISOString().replace("T", " ").substring(0, 19)
-    };
-
-    // Update users array with last login time
-    const updatedUsers = users.map(u => u.id === foundUser.id ? updatedUser : u);
-    handleUpdateUsers(updatedUsers, updatedUser);
-    handleUpdateCurrentUser(updatedUser);
-
-    // Initial log
-    const currentState: AppState = {
-      users: updatedUsers,
-      departments,
-      employees,
-      holidays,
-      attendance,
-      leaves,
-      familyMembers,
-      medicalExpenses,
-      config: config!,
-      logs,
-      currentUser: updatedUser,
-      emailLogs,
-      salaryComponents,
-      taxConfig: taxConfig || undefined,
-      payrollPeriods,
-      salaryStructures,
-      payrollRecords,
-      payslips,
-      payslipDistributionLogs,
-      payrollApprovals,
-      payrollImportLogs,
-      payrollSettings: payrollSettings || undefined,
-    };
-    const updatedLogs = logActivity(currentState, "Security", "Operator Login", emailNorm, `Operator logged in from portal IP`);
-    setLogs(updatedLogs);
-
-    setLoginEmail("");
-    setLoginPassword("");
+  // Password Reset Submission
+  const handlePasswordResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetStatus(null);
+    if (!resetEmail.trim()) {
+      setResetStatus({ type: "error", msg: "Please enter your registered company email address." });
+      return;
+    }
+    const norm = resetEmail.trim().toLowerCase();
+    if (!norm.endsWith("@ethiopianre.com") && norm !== "contactesfaye@gmail.com") {
+      setResetStatus({ type: "error", msg: "Password reset is restricted to registered @ethiopianre.com accounts." });
+      return;
+    }
+    setResetLoading(true);
+    try {
+      try {
+        await sendPasswordResetEmail(auth, norm);
+      } catch (fErr) {
+        console.warn("Firebase Password Reset notice:", fErr);
+      }
+      setResetStatus({ type: "success", msg: `Password reset instructions dispatched to ${norm}. Check your email inbox.` });
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   // User Registration Submissions
@@ -707,61 +749,143 @@ export default function App() {
   };
 
   // Quick credentials loader for evaluator ease of access
-  const handleQuickLogin = (role: UserRole) => {
-    if (role === "Administrator") {
-      setLoginEmail("admin@ethio-re.com");
-      setLoginPassword("admin123");
-    } else {
-      setLoginEmail("hr@ethio-re.com");
-      setLoginPassword("hr123");
-    }
+  const handleQuickLogin = (email: string) => {
+    setLoginEmail(email);
+    setLoginPassword("admin123");
   };
 
-  // LOGIN & REGISTRATION CANVAS (Gated Authentication Layout)
+  // LOGIN & REGISTRATION CANVAS (Minimal Corporate Balanced Layout)
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-900 flex flex-col font-sans">
         <ThemeStyles branding={config.branding} />
         
-        <div className="bg-white rounded-xl shadow-2xl border overflow-hidden max-w-md w-full animate-in fade-in duration-300">
+        {/* Main Balanced 2-Column Split Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 min-h-screen w-full">
           
-          {/* Header Banner */}
-          <div className="bg-primary-custom text-white p-6 text-center relative border-b-4 border-accent-custom">
-            <div className="h-12 w-12 bg-white rounded-full mx-auto flex items-center justify-center text-slate-800 font-black text-sm border-2 border-accent-custom mb-2 animate-bounce">
-              ER
-            </div>
-            <h1 className="text-sm md:text-base font-extrabold tracking-wider uppercase">Ethiopian Reinsurance S.C.</h1>
-            <p className="text-[10px] text-accent-custom font-bold uppercase tracking-widest mt-1">Human Resource Management</p>
-          </div>
+          {/* LEFT SECTION – Minimal Corporate Branding Panel */}
+          <div className="lg:col-span-6 bg-gradient-to-br from-[#001F44] via-[#002B5B] to-[#0A192F] p-8 lg:p-14 text-white flex flex-col justify-between relative overflow-hidden border-b lg:border-b-0 lg:border-r border-white/10 min-h-[480px]">
+            
+            {/* Ambient Background Blur */}
+            <div className="absolute top-0 right-0 w-96 h-96 bg-[#FED100]/5 rounded-full blur-3xl pointer-events-none"></div>
 
-          {loginMode === "login" ? (
-            /* --- LOGIN MODE --- */
-            <form onSubmit={handleLoginSubmit} className="p-6 space-y-4">
-              <div className="text-center">
-                <h2 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Operator authentication</h2>
+            {/* Top Branding Header */}
+            <div className="relative z-10 flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                {config?.profile?.logoUrl ? (
+                  <img 
+                    src={config.profile.logoUrl} 
+                    alt="Ethiopian Reinsurance S.C. Logo" 
+                    className="h-12 max-w-[170px] object-contain drop-shadow-md" 
+                    referrerPolicy="no-referrer" 
+                  />
+                ) : (
+                  <div className="h-12 w-12 rounded-full bg-gradient-to-tr from-[#009A44] via-[#FED100] to-[#E62529] p-0.5 shadow-lg shrink-0">
+                    <div className="w-full h-full rounded-full bg-[#002B5B] flex items-center justify-center font-black text-[#FED100] text-sm border border-white/30">
+                      ER
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <h2 className="font-extrabold text-base md:text-lg tracking-tight text-white leading-snug">
+                    Ethiopian Reinsurance S.C.
+                  </h2>
+                  <p className="text-xs font-bold text-[#FED100] tracking-wide mt-0.5">
+                    የኢትዮጵያ ጠለፋ መድን አ.ማ.
+                  </p>
+                </div>
               </div>
 
+              {/* Secondary Slogan Pill */}
+              <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-widest px-3 py-1 bg-white/10 rounded-full border border-white/20 text-[#FED100] backdrop-blur-xs">
+                Rising with Africa
+              </span>
+            </div>
+
+            {/* Center Content Section */}
+            <div className="relative z-10 my-auto py-10 space-y-6 max-w-xl">
+              
+              {/* Badge Indicator */}
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full border border-white/15 text-slate-200 text-[11px] font-semibold">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                ETRHRMS Enterprise Portal
+              </div>
+
+              <div className="space-y-3">
+                <h1 className="text-2xl lg:text-4xl font-black tracking-tight text-white leading-tight">
+                  Human Resource Management System
+                </h1>
+                <p className="text-xs lg:text-sm text-slate-300 leading-relaxed font-normal">
+                  A centralized platform for managing employee information, leave administration, departmental operations, and HR services across Ethiopian Reinsurance S.C.
+                </p>
+              </div>
+
+              {/* Key Module Highlights */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div className="p-3.5 bg-white/5 border border-white/10 rounded-xl flex items-center gap-3 backdrop-blur-xs">
+                  <div className="h-9 w-9 rounded-lg bg-white/10 flex items-center justify-center text-[#FED100] shrink-0">
+                    <Users className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">Centralized Personnel</h4>
+                    <p className="text-[10px] text-slate-400">Employee Master Records</p>
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-white/5 border border-white/10 rounded-xl flex items-center gap-3 backdrop-blur-xs">
+                  <div className="h-9 w-9 rounded-lg bg-white/10 flex items-center justify-center text-[#FED100] shrink-0">
+                    <ShieldCheck className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">Role-Based Security</h4>
+                    <p className="text-[10px] text-slate-400">Verified Access Control</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Footer Details */}
+            <div className="relative z-10 pt-4 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400 font-medium">
+              <span>© {new Date().getFullYear()} Ethiopian Reinsurance S.C.</span>
+              <span>የኢትዮጵያ ጠለፋ መድን አ.ማ.</span>
+            </div>
+          </div>
+
+          {/* RIGHT SECTION – Balanced Corporate Login Form Panel */}
+          <div className="lg:col-span-6 bg-white p-8 lg:p-16 flex flex-col justify-center min-h-[500px]">
+            <div className="max-w-md w-full mx-auto space-y-6">
+              
+              {/* Header Title & Subtitle */}
+              <div>
+                <h2 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
+                  {loginMode === "login" ? "Welcome Back" : "Operator Registration"}
+                </h2>
+                <p className="text-xs lg:text-sm text-slate-500 font-medium mt-1">
+                  {loginMode === "login"
+                    ? "Sign in to access your ETRHRMS account."
+                    : "Register your operator account with verified @ethiopianre.com email."}
+                </p>
+              </div>
+
+              {/* Status Alerts */}
               {loginError && (
-                <div className="p-3 bg-rose-50 text-rose-800 border border-rose-200 rounded-lg text-xs font-semibold space-y-2">
-                  <p>{loginError}</p>
-                  {/* If unverified, show simulated instant verification shortcuts */}
+                <div className="p-4 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl text-xs font-semibold space-y-2 animate-in fade-in duration-150">
+                  <p className="leading-tight">{loginError}</p>
                   {loginError.includes("verified") && (
-                    <div className="pt-2 border-t border-rose-200/50 flex flex-col gap-1.5">
+                    <div className="pt-2 border-t border-rose-200/60 flex flex-col gap-1.5">
                       <button
                         type="button"
-                        onClick={() => {
-                          alert(`Simulated Action: Verification link resent successfully to: ${loginEmail}`);
-                        }}
-                        className="w-full py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] rounded uppercase transition-all"
+                        onClick={() => alert(`Simulated Notice: Resent email verification link to ${loginEmail}`)}
+                        className="w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] rounded-lg uppercase tracking-wider transition-all"
                       >
                         Resend Verification Email
                       </button>
                       <button
                         type="button"
                         onClick={() => handleSimulateInstantVerification(loginEmail)}
-                        className="w-full py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded uppercase transition-all"
+                        className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg uppercase tracking-wider transition-all"
                       >
-                        ⚡ Simulate Instant Email Verification
+                        ⚡ Simulate Instant Verification (Review Helper)
                       </button>
                     </div>
                   )}
@@ -769,13 +893,13 @@ export default function App() {
               )}
 
               {regSuccessMessage && (
-                <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-semibold space-y-2">
-                  <p>{regSuccessMessage}</p>
-                  <div className="pt-2 border-t border-emerald-200/50">
+                <div className="p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold space-y-2 animate-in fade-in duration-150">
+                  <p className="leading-tight">{regSuccessMessage}</p>
+                  <div className="pt-2 border-t border-emerald-200/60">
                     <button
                       type="button"
-                      onClick={() => handleSimulateInstantVerification(loginEmail || "new_operator@ethiopianre.com")}
-                      className="w-full py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded uppercase transition-all"
+                      onClick={() => handleSimulateInstantVerification(regEmail || loginEmail)}
+                      className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg uppercase tracking-wider transition-all"
                     >
                       ⚡ Simulate Instant Verification for Registered Email
                     </button>
@@ -783,187 +907,266 @@ export default function App() {
                 </div>
               )}
 
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">Company Email Address</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                  <input
-                    type="email"
-                    placeholder="e.g. employee@ethiopianre.com"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border rounded-lg text-xs bg-slate-50/50 ring-primary-custom text-slate-800"
-                    required
-                  />
-                </div>
-              </div>
+              {loginMode === "login" ? (
+                /* --- LOGIN FORM --- */
+                <form onSubmit={handleLoginSubmit} className="space-y-5">
+                  {/* Email Address */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                      Company Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                      <input
+                        type="email"
+                        placeholder="e.g. employee@ethiopianre.com"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] focus:border-transparent text-slate-800 font-medium transition-all"
+                        required
+                      />
+                    </div>
+                  </div>
 
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">Access Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                  <input
-                    type="password"
-                    placeholder="Type password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border rounded-lg text-xs bg-slate-50/50 ring-primary-custom text-slate-800"
-                    required
-                  />
-                </div>
-              </div>
+                  {/* Password */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                      <input
+                        type={showLoginPassword ? "text" : "password"}
+                        placeholder="Enter password"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        className="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] focus:border-transparent text-slate-800 font-medium transition-all"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        className="absolute right-3.5 top-2.5 p-0.5 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                        title={showLoginPassword ? "Hide Password" : "Show Password"}
+                      >
+                        {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
 
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-primary-custom hover:opacity-95 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm uppercase tracking-wide"
-              >
-                <Key className="h-4 w-4 text-accent-custom" />
-                <span>Authenticate Session</span>
-              </button>
+                  {/* Remember Me & Forgot Password Row */}
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <label className="flex items-center gap-2 cursor-pointer text-slate-600 font-medium select-none">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        className="rounded border-slate-300 text-[#002B5B] focus:ring-[#002B5B]"
+                      />
+                      <span>Remember Me</span>
+                    </label>
 
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoginError("");
-                    setRegSuccessMessage("");
-                    setLoginMode("register");
-                  }}
-                  className="text-xs text-primary-custom hover:underline font-bold"
-                >
-                  Need an account? Register / Sign Up here
-                </button>
-              </div>
-            </form>
-          ) : (
-            /* --- REGISTRATION MODE --- */
-            <form onSubmit={handleRegisterSubmit} className="p-6 space-y-4">
-              <div className="text-center">
-                <h2 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">New Operator Registration</h2>
-                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Limited to verified @ethiopianre.com domains only</p>
-              </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResetEmail(loginEmail);
+                        setResetStatus(null);
+                        setForgotPasswordModal(true);
+                      }}
+                      className="text-xs font-extrabold text-[#002B5B] hover:underline"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
 
-              {loginError && (
-                <div className="p-3 bg-rose-50 text-rose-800 border border-rose-200 rounded-lg text-xs font-semibold">
-                  {loginError}
-                </div>
-              )}
-
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">Full Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Almaz Bekele"
-                  value={regFullName}
-                  onChange={(e) => setRegFullName(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-xs bg-slate-50/50 ring-primary-custom text-slate-800"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">Company Email Address</label>
-                <input
-                  type="email"
-                  placeholder="e.g. almaz.bekele@ethiopianre.com"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-xs bg-slate-50/50 ring-primary-custom text-slate-800"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">Password</label>
-                <div className="relative">
-                  <input
-                    type={showRegPassword ? "text" : "password"}
-                    placeholder="Create secure password"
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg text-xs bg-slate-50/50 ring-primary-custom text-slate-800"
-                    required
-                  />
+                  {/* Sign In Button */}
                   <button
-                    type="button"
-                    onClick={() => setShowRegPassword(!showRegPassword)}
-                    className="absolute right-3 top-2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                    type="submit"
+                    disabled={loginLoading}
+                    className="w-full py-3 bg-[#002B5B] hover:bg-[#001F44] text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg uppercase tracking-wider disabled:opacity-50 mt-2 cursor-pointer"
                   >
-                    {showRegPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {loginLoading ? (
+                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <Key className="h-4 w-4 text-[#FED100]" />
+                        <span>Sign In to ETRHRMS</span>
+                      </>
+                    )}
                   </button>
-                </div>
-              </div>
 
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">Confirm Password</label>
-                <input
-                  type="password"
-                  placeholder="Re-type password"
-                  value={regConfirmPassword}
-                  onChange={(e) => setRegConfirmPassword(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-xs bg-slate-50/50 ring-primary-custom text-slate-800"
-                  required
-                />
-              </div>
+                  {/* Register Toggle */}
+                  <div className="text-center pt-4 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginError("");
+                        setRegSuccessMessage("");
+                        setLoginMode("register");
+                      }}
+                      className="text-xs font-bold text-slate-600 hover:text-[#002B5B] transition-colors"
+                    >
+                      Don't have an account? <span className="text-[#002B5B] underline">Register / Sign Up here</span>
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* --- REGISTRATION FORM --- */
+                <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">Full Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Almaz Bekele"
+                      value={regFullName}
+                      onChange={(e) => setRegFullName(e.target.value)}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] text-slate-800 font-medium"
+                      required
+                    />
+                  </div>
 
-              <button
-                type="submit"
-                disabled={regLoading}
-                className="w-full py-2.5 bg-primary-custom hover:opacity-95 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm uppercase tracking-wide disabled:opacity-50"
-              >
-                {regLoading ? (
-                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <>
-                    <ShieldCheck className="h-4 w-4 text-accent-custom" />
-                    <span>Register Operator Account</span>
-                  </>
-                )}
-              </button>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">Company Email Address</label>
+                    <input
+                      type="email"
+                      placeholder="e.g. almaz.bekele@ethiopianre.com"
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] text-slate-800 font-medium"
+                      required
+                    />
+                  </div>
 
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoginError("");
-                    setRegSuccessMessage("");
-                    setLoginMode("login");
-                  }}
-                  className="text-xs text-primary-custom hover:underline font-bold"
-                >
-                  Already registered? Back to Login Screen
-                </button>
-              </div>
-            </form>
-          )}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">Password</label>
+                    <div className="relative">
+                      <input
+                        type={showRegPassword ? "text" : "password"}
+                        placeholder="Create secure password"
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] text-slate-800 font-medium"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegPassword(!showRegPassword)}
+                        className="absolute right-3.5 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none"
+                      >
+                        {showRegPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
 
-          {/* Quick Click credentials block (Extremely convenient for evaluator testing) */}
-          <div className="p-5 bg-slate-50 border-t flex flex-col gap-3">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center block">Testing Credentials Shortcuts</span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("Administrator")}
-                className="bg-white border hover:border-slate-300 hover:bg-slate-100/50 p-2 text-center rounded-lg shadow-2xs transition-all"
-              >
-                <span className="block text-[9px] font-bold uppercase text-slate-400">Admin Account</span>
-                <span className="block text-[10px] font-extrabold text-primary-custom">admin@ethio-re.com</span>
-                <span className="block text-[9px] font-medium text-slate-500 mt-0.5">pass: admin123</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("HR Officer")}
-                className="bg-white border hover:border-slate-300 hover:bg-slate-100/50 p-2 text-center rounded-lg shadow-2xs transition-all"
-              >
-                <span className="block text-[9px] font-bold uppercase text-slate-400">HR Account</span>
-                <span className="block text-[10px] font-extrabold text-primary-custom">hr@ethio-re.com</span>
-                <span className="block text-[9px] font-medium text-slate-500 mt-0.5">pass: hr123</span>
-              </button>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">Confirm Password</label>
+                    <input
+                      type="password"
+                      placeholder="Re-type password"
+                      value={regConfirmPassword}
+                      onChange={(e) => setRegConfirmPassword(e.target.value)}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] text-slate-800 font-medium"
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={regLoading}
+                    className="w-full py-3 bg-[#002B5B] hover:bg-[#001F44] text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-md uppercase tracking-wider disabled:opacity-50 cursor-pointer"
+                  >
+                    {regLoading ? (
+                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <ShieldCheck className="h-4 w-4 text-[#FED100]" />
+                        <span>Register Operator Account</span>
+                      </>
+                    )}
+                  </button>
+
+                  <div className="text-center pt-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginError("");
+                        setRegSuccessMessage("");
+                        setLoginMode("register");
+                      }}
+                      className="text-xs font-bold text-slate-600 hover:text-[#002B5B] transition-colors"
+                    >
+                      Already registered? <span className="text-[#002B5B] underline">Back to Login Screen</span>
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         </div>
-        
-        <p className="text-[10px] text-slate-400 font-semibold mt-4">© {new Date().getFullYear()} Ethiopian Reinsurance Joint-Stock Company. All rights reserved.</p>
+
+        {/* Forgot Password Modal */}
+        {forgotPasswordModal && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              <div className="bg-[#002B5B] text-white px-6 py-4 flex items-center justify-between">
+                <h3 className="font-extrabold text-sm tracking-wide">Reset ETRHRMS Security Password</h3>
+                <button onClick={() => setForgotPasswordModal(false)} className="text-white/80 hover:text-white">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handlePasswordResetSubmit} className="p-6 space-y-4">
+                {resetStatus && (
+                  <div className={`p-3.5 rounded-xl text-xs font-semibold ${
+                    resetStatus.type === "success" ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-rose-50 text-rose-800 border border-rose-200"
+                  }`}>
+                    {resetStatus.msg}
+                  </div>
+                )}
+
+                <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                  Enter your registered @ethiopianre.com company email address. We will dispatch password reset instructions to your inbox.
+                </p>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">Company Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                    <input
+                      type="email"
+                      placeholder="e.g. employee@ethiopianre.com"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] text-slate-800 font-medium"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setForgotPasswordModal(false)}
+                    className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    className="px-4 py-2 text-xs font-black text-white bg-[#002B5B] hover:bg-[#001F44] rounded-xl flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                  >
+                    {resetLoading ? (
+                      <div className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <span>Send Reset Email</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

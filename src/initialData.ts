@@ -9,8 +9,8 @@ import {
 export const DEFAULT_USERS: User[] = [
   {
     id: "U001",
-    fullName: "Admin Ethio-Re",
-    email: "admin@ethio-re.com",
+    fullName: "Tesfaye Teklu (Admin)",
+    email: "contactesfaye@gmail.com",
     password: "admin123",
     role: "Administrator",
     status: "Active",
@@ -20,24 +20,13 @@ export const DEFAULT_USERS: User[] = [
   },
   {
     id: "U002",
-    fullName: "HR Officer Ethio-Re",
-    email: "hr@ethio-re.com",
-    password: "hr123",
-    role: "HR Officer",
-    status: "Active",
-    createdDate: "2026-01-02",
-    lastLogin: "2026-09-04 09:00:00",
-    emailVerified: true
-  },
-  {
-    id: "U003",
-    fullName: "Tesfaye Teklu (Admin)",
-    email: "contactesfaye@gmail.com",
+    fullName: "Tesfaye Teklu Feyissa",
+    email: "tesfayeteklufeyissa@gmail.com",
     password: "admin123",
     role: "Administrator",
     status: "Active",
-    createdDate: "2026-09-04",
-    lastLogin: "",
+    createdDate: "2026-01-01",
+    lastLogin: "2026-09-04 08:30:00",
     emailVerified: true
   }
 ];
@@ -249,7 +238,7 @@ export const DEFAULT_COMPANY_CONFIG: CompanyConfig = {
     smtpSenderEmail: "noreply@ethiopianre.com",
     smtpSenderName: "Ethiopian Reinsurance HRMS",
     useTlsSsl: true,
-    updatedBy: "admin@ethio-re.com",
+    updatedBy: "contactesfaye@gmail.com",
     updatedDate: "2026-01-01"
   }
 };
@@ -269,7 +258,7 @@ export const DEFAULT_EMAIL_LOGS: EmailActivityLog[] = [
     sendingModule: "Payslip Distribution",
     dateTime: "2026-01-28 14:30:00",
     deliveryStatus: "Sent",
-    triggeredBy: "admin@ethio-re.com"
+    triggeredBy: "contactesfaye@gmail.com"
   }
 ];
 
@@ -459,7 +448,7 @@ export const DEFAULT_PAYROLL_PERIODS: PayrollPeriod[] = [
     endDate: "2026-01-31",
     paymentDate: "2026-01-28",
     status: "Open",
-    createdBy: "admin@ethio-re.com",
+    createdBy: "contactesfaye@gmail.com",
     createdDate: "2026-01-01"
   },
   {
@@ -469,7 +458,7 @@ export const DEFAULT_PAYROLL_PERIODS: PayrollPeriod[] = [
     endDate: "2026-02-28",
     paymentDate: "2026-02-26",
     status: "Open",
-    createdBy: "admin@ethio-re.com",
+    createdBy: "contactesfaye@gmail.com",
     createdDate: "2026-02-01"
   }
 ];
@@ -491,7 +480,7 @@ export const DEFAULT_PAYROLL_SETTINGS: PayrollSettings = {
   companyName: "Ethiopian Reinsurance S.C.",
   currency: "ETB",
   autoEmailPayslipsOnApproval: true,
-  updatedBy: "admin@ethio-re.com",
+  updatedBy: "contactesfaye@gmail.com",
   updatedDate: "2026-01-01"
 };
 

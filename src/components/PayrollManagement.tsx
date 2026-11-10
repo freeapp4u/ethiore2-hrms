@@ -576,7 +576,7 @@ export default function PayrollManagement({
       id: existingAppr ? existingAppr.id : `APPR_${selectedPeriod.id}`,
       payrollPeriodId: selectedPeriod.id,
       periodName: selectedPeriod.periodName,
-      submittedBy: currentUser?.email || "hr@ethio-re.com",
+      submittedBy: currentUser?.email || "system@ethiopianre.com",
       submittedDate: new Date().toISOString().replace("T", " ").substring(0, 19),
       totalEmployees: periodSummary.totalEmployees,
       totalGross: periodSummary.totalGross,
@@ -619,7 +619,7 @@ export default function PayrollManagement({
       id: currentApproval ? currentApproval.id : `APPR_${selectedPeriod.id}`,
       payrollPeriodId: selectedPeriod.id,
       periodName: selectedPeriod.periodName,
-      submittedBy: currentApproval?.submittedBy || currentUser?.email || "hr@ethio-re.com",
+      submittedBy: currentApproval?.submittedBy || currentUser?.email || "system@ethiopianre.com",
       submittedDate: currentApproval?.submittedDate || new Date().toISOString().replace("T", " ").substring(0, 19),
       totalEmployees: periodSummary.totalEmployees,
       totalGross: periodSummary.totalGross,
@@ -627,7 +627,7 @@ export default function PayrollManagement({
       totalNet: periodSummary.totalNet,
       totalEmployerPension: periodSummary.totalEmployerPension,
       status: "Approved",
-      actionBy: currentUser?.email || "admin@ethio-re.com",
+      actionBy: currentUser?.email || "contactesfaye@gmail.com",
       actionDate: new Date().toISOString().replace("T", " ").substring(0, 19),
       comments: approvalComments.trim() || "Approved after thorough audit."
     };
@@ -699,7 +699,7 @@ export default function PayrollManagement({
     const updatedApprovals = payrollApprovals.map(a => a.payrollPeriodId === selectedPeriod.id ? {
       ...a,
       status: "Rejected" as any,
-      actionBy: currentUser?.email || "admin@ethio-re.com",
+      actionBy: currentUser?.email || "contactesfaye@gmail.com",
       actionDate: new Date().toISOString().replace("T", " ").substring(0, 19),
       comments: approvalComments.trim() || "Rejected. Recalculation requested."
     } : a);
@@ -749,7 +749,7 @@ export default function PayrollManagement({
       sendingDate: new Date().toISOString().replace("T", " ").substring(0, 19),
       deliveryStatus: emailResult.blocked ? "Failed" : "Sent",
       errorDetails: emailResult.blocked ? "Blocked – Employee Email Sending Disabled in Settings" : undefined,
-      sentBy: currentUser?.email || "hr@ethio-re.com"
+      sentBy: currentUser?.email || "system@ethiopianre.com"
     };
 
     onUpdateDistributionLogs([logItem, ...payslipDistributionLogs]);
@@ -801,7 +801,7 @@ export default function PayrollManagement({
         sendingDate: new Date().toISOString().replace("T", " ").substring(0, 19),
         deliveryStatus: emailResult.blocked ? "Failed" : "Sent",
         errorDetails: emailResult.blocked ? "Blocked – Email Sending Disabled in Settings" : undefined,
-        sentBy: currentUser?.email || "hr@ethio-re.com"
+        sentBy: currentUser?.email || "system@ethiopianre.com"
       });
     });
 

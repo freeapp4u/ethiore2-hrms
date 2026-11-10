@@ -88,14 +88,18 @@ export function loadState(): AppState {
   const demoFamIds = new Set(["FAM001", "FAM002", "FAM003"]);
   const demoMedIds = new Set(["MED001", "MED002", "MED003"]);
   const demoLogIds = new Set(["LOG001", "LOG002"]);
+  const demoUserEmails = new Set(["admin@ethio-re.com", "hr@ethio-re.com"]);
 
+  const rawUsers = getOrSeed<User[]>(STORAGE_KEYS.USERS, DEFAULT_USERS);
   const rawEmployees = getOrSeed<Employee[]>(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
   const rawAttendance = getOrSeed<AttendanceRecord[]>(STORAGE_KEYS.ATTENDANCE, DEFAULT_ATTENDANCE);
   const rawLeaves = getOrSeed<LeaveRecord[]>(STORAGE_KEYS.LEAVES, DEFAULT_LEAVES);
   const rawFamilyMembers = getOrSeed<FamilyMember[]>(STORAGE_KEYS.FAMILY_MEMBERS, DEFAULT_FAMILY_MEMBERS);
   const rawMedicalExpenses = getOrSeed<MedicalExpense[]>(STORAGE_KEYS.MEDICAL_EXPENSES, DEFAULT_MEDICAL_EXPENSES);
   const rawLogs = getOrSeed<ActivityLog[]>(STORAGE_KEYS.LOGS, DEFAULT_ACTIVITY_LOGS);
+  let rawCurrentUser = getOrSeed<User | null>(STORAGE_KEYS.CURRENT_USER, null);
 
+  const cleanUsers = rawUsers.filter(u => !demoUserEmails.has(u.email.toLowerCase()));
   const cleanEmployees = rawEmployees.filter(e => !demoEmpIds.has(e.employeeId));
   const cleanAttendance = rawAttendance.filter(a => !demoAttIds.has(a.id) && !demoEmpIds.has(a.employeeId));
   const cleanLeaves = rawLeaves.filter(l => !demoLeaveIds.has(l.id) && !demoEmpIds.has(l.employeeId));
@@ -103,7 +107,13 @@ export function loadState(): AppState {
   const cleanMedicalExpenses = rawMedicalExpenses.filter(m => !demoMedIds.has(m.id) && !demoEmpIds.has(m.employeeId));
   const cleanLogs = rawLogs.filter(l => !demoLogIds.has(l.id));
 
+  if (rawCurrentUser && demoUserEmails.has(rawCurrentUser.email.toLowerCase())) {
+    rawCurrentUser = null;
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+  }
+
   // Persist sanitized state back
+  localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(cleanUsers));
   localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(cleanEmployees));
   localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(cleanAttendance));
   localStorage.setItem(STORAGE_KEYS.LEAVES, JSON.stringify(cleanLeaves));
@@ -112,7 +122,7 @@ export function loadState(): AppState {
   localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(cleanLogs));
 
   return {
-    users: getOrSeed<User[]>(STORAGE_KEYS.USERS, DEFAULT_USERS),
+    users: cleanUsers.length > 0 ? cleanUsers : DEFAULT_USERS,
     departments: getOrSeed<Department[]>(STORAGE_KEYS.DEPARTMENTS, DEFAULT_DEPARTMENTS),
     employees: cleanEmployees,
     holidays: getOrSeed<PublicHoliday[]>(STORAGE_KEYS.HOLIDAYS, DEFAULT_HOLIDAYS),
@@ -122,7 +132,7 @@ export function loadState(): AppState {
     medicalExpenses: cleanMedicalExpenses,
     config: getOrSeed<CompanyConfig>(STORAGE_KEYS.CONFIG, DEFAULT_COMPANY_CONFIG),
     logs: cleanLogs,
-    currentUser: getOrSeed<User | null>(STORAGE_KEYS.CURRENT_USER, null),
+    currentUser: rawCurrentUser,
     emailLogs: getOrSeed<EmailActivityLog[]>(STORAGE_KEYS.EMAIL_LOGS, DEFAULT_EMAIL_LOGS),
     // Payroll State Load
     salaryComponents: getOrSeed<SalaryComponent[]>(STORAGE_KEYS.SALARY_COMPONENTS, DEFAULT_SALARY_COMPONENTS),

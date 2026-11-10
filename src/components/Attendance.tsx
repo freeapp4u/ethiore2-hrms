@@ -149,7 +149,7 @@ export default function Attendance({
       workingHours: computedStatus === "Absent" || computedStatus === "On Leave" ? 0 : workingHrs,
       lateStatus: isLate,
       remarks,
-      recordedBy: currentUser?.email || "hr@ethio-re.com",
+      recordedBy: currentUser?.email || "system@ethiopianre.com",
       createdDate: new Date().toISOString().replace("T", " ").substring(0, 19),
       updatedDate: new Date().toISOString().replace("T", " ").substring(0, 19)
     };

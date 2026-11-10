@@ -275,7 +275,7 @@ export default function MedicalManagement({
       amountETB: Number(claimAmount),
       supportingDocumentUrl: claimDocUrl.trim() || undefined,
       remarks: claimRemarks.trim(),
-      recordedBy: currentUser?.email || "hr@ethio-re.com",
+      recordedBy: currentUser?.email || "system@ethiopianre.com",
       createdDate: selectedClaim ? selectedClaim.createdDate : new Date().toISOString().replace("T", " ").substring(0, 19),
       updatedDate: new Date().toISOString().replace("T", " ").substring(0, 19)
     };
@@ -443,7 +443,7 @@ export default function MedicalManagement({
         ...medicalPolicy,
         defaultFamilyAllocationETB: Number(polDefaultAlloc),
         requiresInvoiceNumber: polReqInvoice,
-        updatedBy: currentUser?.email || "admin@ethio-re.com",
+        updatedBy: currentUser?.email || "contactesfaye@gmail.com",
         updatedDate: new Date().toISOString().replace("T", " ").substring(0, 19)
       }
     };
