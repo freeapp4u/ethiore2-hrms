@@ -3,7 +3,7 @@ import {
   PublicHoliday, CompanyConfig, ActivityLog, FamilyMember, MedicalExpense,
   SalaryComponent, TaxConfiguration, PayrollPeriod, EmployeeSalaryStructure,
   PayrollRecord, Payslip, PayslipDistributionLog, PayrollApproval, PayrollImportLog, PayrollSettings,
-  EmailActivityLog
+  EmailActivityLog, SystemRole, RolePermissions
 } from "./types";
 import { 
   DEFAULT_USERS, DEFAULT_DEPARTMENTS, DEFAULT_EMPLOYEES, 
@@ -39,7 +39,9 @@ const STORAGE_KEYS = {
   PAYSLIP_DISTRIBUTION_LOGS: "ethiore_payslip_distribution_logs",
   PAYROLL_APPROVALS: "ethiore_payroll_approvals",
   PAYROLL_IMPORT_LOGS: "ethiore_payroll_import_logs",
-  PAYROLL_SETTINGS: "ethiore_payroll_settings"
+  PAYROLL_SETTINGS: "ethiore_payroll_settings",
+  ROLES: "ethiore_roles",
+  ROLE_PERMISSIONS: "ethiore_role_permissions"
 };
 
 export interface AppState {
@@ -66,6 +68,8 @@ export interface AppState {
   payrollApprovals: PayrollApproval[];
   payrollImportLogs: PayrollImportLog[];
   payrollSettings: PayrollSettings;
+  roles: SystemRole[];
+  rolePermissions: RolePermissions[];
 }
 
 export function loadState(): AppState {
@@ -144,7 +148,9 @@ export function loadState(): AppState {
     payslipDistributionLogs: getOrSeed<PayslipDistributionLog[]>(STORAGE_KEYS.PAYSLIP_DISTRIBUTION_LOGS, DEFAULT_PAYSLIP_DISTRIBUTION_LOGS),
     payrollApprovals: getOrSeed<PayrollApproval[]>(STORAGE_KEYS.PAYROLL_APPROVALS, DEFAULT_PAYROLL_APPROVALS),
     payrollImportLogs: getOrSeed<PayrollImportLog[]>(STORAGE_KEYS.PAYROLL_IMPORT_LOGS, DEFAULT_PAYROLL_IMPORT_LOGS),
-    payrollSettings: getOrSeed<PayrollSettings>(STORAGE_KEYS.PAYROLL_SETTINGS, DEFAULT_PAYROLL_SETTINGS)
+    payrollSettings: getOrSeed<PayrollSettings>(STORAGE_KEYS.PAYROLL_SETTINGS, DEFAULT_PAYROLL_SETTINGS),
+    roles: getOrSeed<SystemRole[]>(STORAGE_KEYS.ROLES, []),
+    rolePermissions: getOrSeed<RolePermissions[]>(STORAGE_KEYS.ROLE_PERMISSIONS, [])
   };
 }
 
@@ -173,6 +179,8 @@ export function saveState(state: Partial<AppState>) {
   if (state.payrollApprovals !== undefined) localStorage.setItem(STORAGE_KEYS.PAYROLL_APPROVALS, JSON.stringify(state.payrollApprovals));
   if (state.payrollImportLogs !== undefined) localStorage.setItem(STORAGE_KEYS.PAYROLL_IMPORT_LOGS, JSON.stringify(state.payrollImportLogs));
   if (state.payrollSettings !== undefined) localStorage.setItem(STORAGE_KEYS.PAYROLL_SETTINGS, JSON.stringify(state.payrollSettings));
+  if (state.roles !== undefined) localStorage.setItem(STORAGE_KEYS.ROLES, JSON.stringify(state.roles));
+  if (state.rolePermissions !== undefined) localStorage.setItem(STORAGE_KEYS.ROLE_PERMISSIONS, JSON.stringify(state.rolePermissions));
 }
 
 // Global logger helper

@@ -9,16 +9,18 @@ import {
   createUserWithEmailAndPassword, 
   signOut, 
   sendEmailVerification,
-  sendPasswordResetEmail 
+  sendPasswordResetEmail,
+  onAuthStateChanged
 } from "./firebase";
 import { 
   User, Department, Employee, AttendanceRecord, LeaveRecord, 
   PublicHoliday, CompanyConfig, ActivityLog, UserRole, AccountStatus,
   FamilyMember, MedicalExpense,
   SalaryComponent, TaxConfiguration, PayrollPeriod, EmployeeSalaryStructure,
-  PayrollRecord, Payslip, PayslipDistributionLog, PayrollApproval, PayrollImportLog, PayrollSettings,
-  EmailActivityLog
+  EmailActivityLog, SystemRole, RolePermissions
 } from "./types";
+import { DEFAULT_ROLES, getDefaultRolePermissions, hasPermission } from "./utils/rbacUtils";
+import { APP_MODULES } from "./config/permissions";
 
 // Component Imports
 import ThemeStyles from "./components/ThemeStyles";
@@ -36,7 +38,24 @@ import Reports from "./components/Reports";
 import HelpCenter from "./components/HelpCenter";
 import DocumentVault from "./components/DocumentVault";
 
-import { ShieldCheck, Lock, Mail, ServerCrash, Key, Eye, EyeOff, X, Users } from "lucide-react";
+import { ShieldCheck, Lock, Mail, ServerCrash, Key, Eye, EyeOff, X, Users, CheckCircle2, AlertCircle } from "lucide-react";
+
+const AUTHORIZED_ADMIN_EXCEPTIONS = [
+  "contactesfaye@gmail.com",
+  "tesfayeteklufeyissa@gmail.com"
+];
+
+const isAuthorizedEmail = (email: string): boolean => {
+  const norm = email.trim().toLowerCase();
+  if (AUTHORIZED_ADMIN_EXCEPTIONS.includes(norm)) return true;
+  if (norm.endsWith("@ethiopianre.com")) return true;
+  return false;
+};
+
+const isAuthorizedAdminException = (email: string): boolean => {
+  const norm = email.trim().toLowerCase();
+  return AUTHORIZED_ADMIN_EXCEPTIONS.includes(norm);
+};
 
 export default function App() {
   // Core App state variables
@@ -53,6 +72,8 @@ export default function App() {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [emailLogs, setEmailLogs] = useState<EmailActivityLog[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [roles, setRoles] = useState<SystemRole[]>([]);
+  const [rolePermissions, setRolePermissions] = useState<RolePermissions[]>([]);
 
   // Payroll Management State
   const [salaryComponents, setSalaryComponents] = useState<SalaryComponent[]>([]);
@@ -99,6 +120,12 @@ export default function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
 
+  // Unverified login helper states
+  const [unverifiedUserEmail, setUnverifiedUserEmail] = useState("");
+  const [unverifiedPassword, setUnverifiedPassword] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSuccessMsg, setResendSuccessMsg] = useState("");
+
   // Forgot Password modal states
   const [forgotPasswordModal, setForgotPasswordModal] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
@@ -114,8 +141,9 @@ export default function App() {
   const [regPassword, setRegPassword] = useState("");
   const [regConfirmPassword, setRegConfirmPassword] = useState("");
   const [showRegPassword, setShowRegPassword] = useState(false);
-  const [regSuccessMessage, setRegSuccessMessage] = useState("");
   const [regLoading, setRegLoading] = useState(false);
+  const [regCompleted, setRegCompleted] = useState(false);
+  const [regCompletedEmail, setRegCompletedEmail] = useState("");
 
   // Load state from local storage on mount
   useEffect(() => {
@@ -152,9 +180,56 @@ export default function App() {
     setPayrollApprovals(state.payrollApprovals || []);
     setPayrollImportLogs(state.payrollImportLogs || []);
     setPayrollSettings(state.payrollSettings || null);
+    setRoles(state.roles || []);
+    setRolePermissions(state.rolePermissions || []);
 
     setLoading(false);
   }, []);
+
+  // Enforce Firebase Auth state verification on startup and auth changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        try {
+          await fbUser.reload();
+        } catch (reloadErr) {
+          console.warn("Firebase Auth user reload notice:", reloadErr);
+        }
+
+        const emailNorm = fbUser.email?.toLowerCase() || "";
+        const isAllowed = isAuthorizedEmail(emailNorm);
+
+        if (!isAllowed || !fbUser.emailVerified) {
+          // Immediately sign out unverified user or unauthorized email domain
+          await signOut(auth);
+          setCurrentUser(null);
+          saveState({ currentUser: null });
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+    }
+  }, []);
+
+  // Initialize roles and permissions if empty
+  useEffect(() => {
+    if (!loading && roles.length === 0) {
+      const initialRoles = DEFAULT_ROLES;
+      const initialPerms = initialRoles.map(r => getDefaultRolePermissions(r.id));
+      
+      setRoles(initialRoles);
+      setRolePermissions(initialPerms);
+      saveState({ roles: initialRoles, rolePermissions: initialPerms });
+
+      // Sync to cloud if authenticated
+      if (auth.currentUser) {
+        initialRoles.forEach(r => syncRecordToFirestore("roles", r.id, r));
+        initialPerms.forEach(p => syncRecordToFirestore("role_permissions", p.id, p));
+      }
+    }
+  }, [loading, roles.length]);
 
   if (loading || !config) {
     return (
@@ -229,11 +304,36 @@ export default function App() {
     saveState({ currentUser: user });
   };
 
+  const handleUpdateRoles = (newRoles: SystemRole[]) => {
+    setRoles(newRoles);
+    saveState({ roles: newRoles });
+    newRoles.forEach(r => syncRecordToFirestore("roles", r.id, r));
+  };
+
+  const handleUpdateRolePermissions = (newPerms: RolePermissions[]) => {
+    setRolePermissions(newPerms);
+    saveState({ rolePermissions: newPerms });
+    newPerms.forEach(p => syncRecordToFirestore("role_permissions", p.id, p));
+  };
+
   // Payroll State Update Handlers
   const handleUpdateSalaryComponents = (newComponents: SalaryComponent[]) => {
     setSalaryComponents(newComponents);
     saveState({ salaryComponents: newComponents });
     newComponents.forEach(c => syncRecordToFirestore("salary_components", c.id, c));
+  };
+  const handleDeleteSalaryComponent = (id: string): boolean => {
+    if (currentUser?.role !== "Administrator") return false;
+    
+    // Check if used in structures
+    const isUsed = salaryStructures.some(s => s.recurringDeductions?.[id] !== undefined);
+    if (isUsed) return false;
+
+    const updated = salaryComponents.filter(c => c.id !== id);
+    setSalaryComponents(updated);
+    saveState({ salaryComponents: updated });
+    deleteRecordFromFirestore("salary_components", id);
+    return true;
   };
 
   const handleUpdateTaxConfig = (newTaxConfig: TaxConfiguration) => {
@@ -247,6 +347,19 @@ export default function App() {
     saveState({ payrollPeriods: newPeriods });
     newPeriods.forEach(p => syncRecordToFirestore("payroll_periods", p.id, p));
   };
+  const handleDeletePayrollPeriod = (id: string): boolean => {
+    if (currentUser?.role !== "Administrator") return false;
+
+    // Check if records exist
+    const hasRecords = payrollRecords.some(r => r.payrollPeriodId === id);
+    if (hasRecords) return false;
+
+    const updated = payrollPeriods.filter(p => p.id !== id);
+    setPayrollPeriods(updated);
+    saveState({ payrollPeriods: updated });
+    deleteRecordFromFirestore("payroll_periods", id);
+    return true;
+  };
 
   const handleUpdateSalaryStructures = (newStructures: EmployeeSalaryStructure[]) => {
     setSalaryStructures(newStructures);
@@ -259,11 +372,38 @@ export default function App() {
     saveState({ payrollRecords: newRecords });
     newRecords.forEach(r => syncRecordToFirestore("payroll_records", r.id, r));
   };
+  const handleDeletePayrollRecord = (id: string): boolean => {
+    if (currentUser?.role !== "Administrator" && currentUser?.role !== "HR Officer") return false;
+    
+    const updated = payrollRecords.filter(r => r.id !== id);
+    handleUpdatePayrollRecords(updated);
+
+    const record = payrollRecords.find(r => r.id === id);
+    if (record) {
+      const deletedRecord = {
+        ...record,
+        isDeleted: true,
+        deletedAt: new Date().toISOString().replace("T", " ").substring(0, 19),
+        deletedBy: currentUser.email
+      };
+      syncRecordToFirestore("payroll_records", id, deletedRecord);
+    }
+    handleLogAction("Payroll", "Delete Record", id, `Payroll record ${id} soft-deleted`);
+    return true;
+  };
 
   const handleUpdatePayslips = (newPayslips: Payslip[]) => {
     setPayslips(newPayslips);
     saveState({ payslips: newPayslips });
     newPayslips.forEach(ps => syncRecordToFirestore("payslips", ps.id, ps));
+  };
+  const handleDeletePayslip = (id: string): boolean => {
+    if (currentUser?.role !== "Administrator") return false;
+    const updated = payslips.filter(p => p.id !== id);
+    setPayslips(updated);
+    saveState({ payslips: updated });
+    deleteRecordFromFirestore("payslips", id);
+    return true;
   };
 
   const handleUpdatePayslipDistributionLogs = (newLogs: PayslipDistributionLog[]) => {
@@ -324,6 +464,7 @@ export default function App() {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
+    setResendSuccessMsg("");
 
     if (!loginEmail.trim() || !loginPassword) {
       setLoginError("Please enter both your company email address and password.");
@@ -331,27 +472,10 @@ export default function App() {
     }
 
     const emailNorm = loginEmail.trim().toLowerCase();
-    const foundUser = users.find(u => u.email.toLowerCase() === emailNorm);
 
-    if (!foundUser) {
-      setLoginError("Unauthorized credentials: No registered account found with this email address.");
-      return;
-    }
-
-    if (foundUser.password !== loginPassword) {
-      setLoginError("Authentication failed: Password value is incorrect.");
-      return;
-    }
-
-    // Checking email verification first (except for contactesfaye@gmail.com which is the special Admin exception)
-    if (emailNorm !== "contactesfaye@gmail.com" && !foundUser.emailVerified) {
-      setLoginError("Your email address has not been verified. Please check your email and complete verification before logging in.");
-      return;
-    }
-
-    // Checking Account Status
-    if (foundUser.status !== "Active") {
-      setLoginError(`Authentication failed: This operator account is currently ${foundUser.status}. Contact administrator.`);
+    // 1. Email allowlist check (@ethiopianre.com or authorized admin exception emails)
+    if (!isAuthorizedEmail(emailNorm)) {
+      setLoginError("Access is restricted to official Ethiopian Reinsurance email addresses (@ethiopianre.com) or authorized system administrators.");
       return;
     }
 
@@ -359,30 +483,93 @@ export default function App() {
 
     try {
       // Establish Firebase Auth session
+      let userCred;
       try {
-        await signInWithEmailAndPassword(auth, emailNorm, loginPassword);
-      } catch (authErr: any) {
-        if (authErr?.code === "auth/user-not-found" || authErr?.code === "auth/invalid-credential") {
+        userCred = await signInWithEmailAndPassword(auth, emailNorm, loginPassword);
+      } catch (firstAuthErr: any) {
+        // If account does not exist in Firebase Auth yet, attempt auto-creation for authorized exception accounts or pre-seeded users
+        const foundUser = users.find(u => u.email.toLowerCase() === emailNorm);
+        const isExceptionAdmin = isAuthorizedAdminException(emailNorm);
+
+        if (isExceptionAdmin || (foundUser && foundUser.password === loginPassword)) {
           try {
-            await createUserWithEmailAndPassword(auth, emailNorm, loginPassword);
-          } catch (createErr) {
-            console.warn("Firebase Auth seed notice:", createErr);
+            userCred = await createUserWithEmailAndPassword(auth, emailNorm, loginPassword);
+            try {
+              await sendEmailVerification(userCred.user);
+            } catch (vErr) {
+              console.warn("sendEmailVerification notice:", vErr);
+            }
+          } catch (createErr: any) {
+            if (createErr?.code === "auth/email-already-in-use") {
+              setLoginError("Invalid password for this account. Please check your password or click 'Forgot Password?' below.");
+              return;
+            }
+            throw firstAuthErr;
           }
         } else {
-          console.warn("Firebase Auth sign in notice:", authErr);
+          throw firstAuthErr;
         }
       }
+      
+      // Reload Firebase user status from server to get fresh emailVerified state
+      try {
+        await userCred.user.reload();
+      } catch (rErr) {
+        console.warn("Reload user notice:", rErr);
+      }
 
-      // Success login
-      const updatedUser = {
+      const firebaseUser = auth.currentUser;
+
+      // Check email verification status for ALL accounts (including exception emails)
+      if (!firebaseUser?.emailVerified) {
+        // Immediately sign out unverified user
+        await signOut(auth);
+        setUnverifiedUserEmail(emailNorm);
+        setUnverifiedPassword(loginPassword);
+        setLoginError("EMAIL_VERIFICATION_REQUIRED");
+        return;
+      }
+
+      // Success login - assign Administrator for exception emails or maintain user role (defaulting to Employee)
+      const foundUser = users.find(u => u.email.toLowerCase() === emailNorm);
+      const targetRole: UserRole = isAuthorizedAdminException(emailNorm) ? "Administrator" : (foundUser?.role || "Employee");
+      
+      // Match employee case-insensitively and trim
+      const matchingEmployee = employees.find(e => e.email.trim().toLowerCase() === emailNorm);
+      const linkedEmployeeId = foundUser?.employeeId || matchingEmployee?.employeeId;
+
+      // MANDATORY: If role is Employee, it MUST be linked to an employee record
+      if (targetRole === "Employee" && !linkedEmployeeId) {
+        await signOut(auth);
+        setLoginError("Your account is not linked to an employee record. Please contact the HR Department to link your employee profile.");
+        setLoginLoading(false);
+        return;
+      }
+
+      const userToLogin: User = foundUser ? {
         ...foundUser,
+        role: targetRole,
+        employeeId: linkedEmployeeId,
+        emailVerified: true,
+        status: "Active",
+        lastLogin: new Date().toISOString().replace("T", " ").substring(0, 19)
+      } : {
+        id: firebaseUser ? firebaseUser.uid : `U_${Date.now()}`,
+        fullName: firebaseUser?.displayName || emailNorm.split("@")[0],
+        email: emailNorm,
+        password: loginPassword,
+        role: targetRole,
+        employeeId: linkedEmployeeId,
+        status: "Active",
+        emailVerified: true,
         lastLogin: new Date().toISOString().replace("T", " ").substring(0, 19)
       };
 
-      // Update users array with last login time
-      const updatedUsers = users.map(u => u.id === foundUser.id ? updatedUser : u);
-      handleUpdateUsers(updatedUsers, updatedUser);
-      handleUpdateCurrentUser(updatedUser);
+      const updatedUsers = users.map(u => u.email.toLowerCase() === emailNorm ? userToLogin : u);
+      if (!foundUser) updatedUsers.push(userToLogin);
+
+      handleUpdateUsers(updatedUsers, userToLogin);
+      handleUpdateCurrentUser(userToLogin);
 
       // Initial log
       const currentState: AppState = {
@@ -396,7 +583,7 @@ export default function App() {
         medicalExpenses,
         config: config!,
         logs,
-        currentUser: updatedUser,
+        currentUser: userToLogin,
         emailLogs,
         salaryComponents,
         taxConfig: taxConfig || undefined,
@@ -409,13 +596,60 @@ export default function App() {
         payrollImportLogs,
         payrollSettings: payrollSettings || undefined,
       };
-      const updatedLogs = logActivity(currentState, "Security", "Operator Login", emailNorm, `Operator logged in from portal IP`);
+      const updatedLogs = logActivity(currentState, "Security", "Operator Login", emailNorm, `Operator logged in from portal IP (${targetRole})`);
       setLogs(updatedLogs);
 
       setLoginEmail("");
       setLoginPassword("");
+      setUnverifiedUserEmail("");
+      setUnverifiedPassword("");
+    } catch (authErr: any) {
+      console.warn("Authentication notice:", authErr?.code || authErr?.message);
+      if (authErr?.code === "auth/user-not-found" || authErr?.code === "auth/wrong-password" || authErr?.code === "auth/invalid-credential") {
+        setLoginError("Invalid email or password. Please check your credentials or click 'Register / Sign Up' below if you haven't created an account yet.");
+      } else if (authErr?.code === "auth/user-disabled") {
+        setLoginError("Authentication failed: This account has been disabled. Please contact system administrator.");
+      } else if (authErr?.code === "auth/network-request-failed") {
+        setLoginError("Network error: Please check your internet connection.");
+      } else {
+        setLoginError(authErr?.message || "Authentication failed. Please check your credentials.");
+      }
     } finally {
       setLoginLoading(false);
+    }
+  };
+
+  // Resend Email Verification Handler
+  const handleResendVerification = async () => {
+    const targetEmail = unverifiedUserEmail || loginEmail.trim().toLowerCase();
+    const targetPass = unverifiedPassword || loginPassword;
+
+    if (!targetEmail) {
+      setLoginError("Please enter your company email address.");
+      return;
+    }
+    if (!targetPass) {
+      setLoginError("Please enter your password to resend verification email.");
+      return;
+    }
+
+    setResendLoading(true);
+    setResendSuccessMsg("");
+
+    try {
+      const cred = await signInWithEmailAndPassword(auth, targetEmail, targetPass);
+      await sendEmailVerification(cred.user);
+      await signOut(auth);
+      setResendSuccessMsg(`A new verification link has been sent to ${targetEmail}. Please check your email inbox.`);
+    } catch (err: any) {
+      console.warn("Resend verification notice:", err?.code || err?.message);
+      if (err?.code === "auth/too-many-requests") {
+        setLoginError("Too many verification requests. Please wait a few minutes before trying again.");
+      } else {
+        setLoginError("Could not send verification email. Please check your credentials.");
+      }
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -428,8 +662,8 @@ export default function App() {
       return;
     }
     const norm = resetEmail.trim().toLowerCase();
-    if (!norm.endsWith("@ethiopianre.com") && norm !== "contactesfaye@gmail.com") {
-      setResetStatus({ type: "error", msg: "Password reset is restricted to registered @ethiopianre.com accounts." });
+    if (!isAuthorizedEmail(norm)) {
+      setResetStatus({ type: "error", msg: "Password reset is restricted to registered @ethiopianre.com accounts or authorized system administrators." });
       return;
     }
     setResetLoading(true);
@@ -449,7 +683,6 @@ export default function App() {
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
-    setRegSuccessMessage("");
 
     if (!regFullName.trim() || !regEmail.trim() || !regPassword || !regConfirmPassword) {
       setLoginError("Please fill out all registration fields.");
@@ -464,42 +697,41 @@ export default function App() {
       return;
     }
 
-    // 2. Ethiopian Reinsurance Domain restriction
-    if (!emailNorm.endsWith("@ethiopianre.com")) {
-      setLoginError("Only users with an @ethiopianre.com company email address are allowed to register.");
+    // 2. Validate email allowlist BEFORE creating Firebase Auth account
+    if (!isAuthorizedEmail(emailNorm)) {
+      setLoginError("Registration is restricted to official Ethiopian Reinsurance email addresses (@ethiopianre.com).");
       return;
     }
 
     // 3. Prevent duplicate emails
-    const isDuplicate = users.some(u => u.email.toLowerCase() === emailNorm);
-    if (isDuplicate) {
-      setLoginError("Registration error: A portal operator account is already registered with this email address.");
+    if (users.some(u => u.email.toLowerCase() === emailNorm)) {
+      setLoginError("EMAIL_ALREADY_IN_USE");
       return;
     }
+
+    // 4. Automatic Role Assignment: "Administrator" for authorized exception emails, default "Employee" for newly registered users
+    const assignedRole: UserRole = isAuthorizedAdminException(emailNorm) ? "Administrator" : "Employee";
+    const matchingEmployee = employees.find(e => e.email.toLowerCase() === emailNorm);
 
     setRegLoading(true);
 
     try {
-      let createdUid = `U_${Date.now()}`;
+      const userCred = await createUserWithEmailAndPassword(auth, emailNorm, regPassword);
+      
       try {
-        const userCred = await createUserWithEmailAndPassword(auth, emailNorm, regPassword);
-        createdUid = userCred.user.uid;
-        try {
-          await sendEmailVerification(userCred.user);
-        } catch (vErr) {
-          console.warn("sendEmailVerification notice:", vErr);
-        }
-      } catch (authErr: any) {
-        console.warn("Firebase Auth registration notice (fallback to local record):", authErr);
+        await sendEmailVerification(userCred.user);
+      } catch (vErr) {
+        console.warn("sendEmailVerification notice:", vErr);
       }
 
       const newUser: User = {
-        id: createdUid,
+        id: userCred.user.uid,
         fullName: regFullName.trim(),
         email: emailNorm,
         password: regPassword,
-        role: "HR Officer", // Automatic Default role assigned
-        status: "Pending Verification", // Automatic Default status assigned
+        role: assignedRole,
+        employeeId: matchingEmployee?.employeeId,
+        status: "Pending Verification",
         emailVerified: false,
         createdDate: new Date().toISOString().split("T")[0]
       };
@@ -507,32 +739,28 @@ export default function App() {
       const updatedUsers = [...users, newUser];
       handleUpdateUsers(updatedUsers, newUser);
 
-      setRegSuccessMessage("Registration successful. Please check your @ethiopianre.com email address and verify your account before logging in.");
-
-      // Clean registration inputs
+      // Clean registration inputs & trigger Registration Success view
       setRegFullName("");
       setRegEmail("");
       setRegPassword("");
       setRegConfirmPassword("");
+      setRegCompletedEmail(emailNorm);
+      setRegCompleted(true);
+    } catch (authErr: any) {
+      console.warn("Firebase Auth registration notice:", authErr?.code || authErr?.message);
+      if (authErr?.code === "auth/email-already-in-use") {
+        setLoginError("EMAIL_ALREADY_IN_USE");
+      } else if (authErr?.code === "auth/invalid-email") {
+        setLoginError("Invalid email address format.");
+      } else if (authErr?.code === "auth/weak-password") {
+        setLoginError("Password is too weak. Please use at least 6 characters.");
+      } else if (authErr?.code === "auth/network-request-failed") {
+        setLoginError("Network error: Please check your internet connection.");
+      } else {
+        setLoginError(authErr?.message || "Registration failed. Please check your information.");
+      }
     } finally {
       setRegLoading(false);
-    }
-  };
-
-  // Helper function to simulate instant email verification for review convenience
-  const handleSimulateInstantVerification = (email: string) => {
-    const emailNorm = email.trim().toLowerCase();
-    const found = users.find(u => u.email.toLowerCase() === emailNorm);
-    if (found) {
-      const verifiedUser = { ...found, emailVerified: true, status: "Active" as any };
-      const updatedUsers = users.map(u => u.id === found.id ? verifiedUser : u);
-      handleUpdateUsers(updatedUsers, verifiedUser);
-      alert(`Simulation Success: ${found.fullName} (${emailNorm}) has been successfully verified & status set to Active! You can now log in.`);
-      setLoginEmail(emailNorm);
-      setLoginPassword(found.password);
-      setLoginError("");
-    } else {
-      alert(`Simulation Error: Could not find user account with email "${emailNorm}" to verify.`);
     }
   };
 
@@ -647,16 +875,43 @@ export default function App() {
     syncRecordToFirestore("employees", emp.employeeId, emp);
   };
   const handleDeleteEmployee = (id: string): boolean => {
-    // Only archive/deactivate by default, unless Admin forces delete
+    if (currentUser?.role !== "Administrator" && currentUser?.role !== "HR Officer") return false;
+    
+    // Soft deletion logic
     const updated = employees.map(e => {
       if (e.employeeId === id) {
-        const inactiveEmp = { ...e, status: "Inactive" as const };
-        syncRecordToFirestore("employees", inactiveEmp.employeeId, inactiveEmp);
-        return inactiveEmp;
+        const deletedEmp = { 
+          ...e, 
+          status: "Inactive" as const,
+          isDeleted: true,
+          deletedAt: new Date().toISOString().replace("T", " ").substring(0, 19),
+          deletedBy: currentUser.email
+        };
+        syncRecordToFirestore("employees", deletedEmp.employeeId, deletedEmp);
+        return deletedEmp;
       }
       return e;
     });
     handleUpdateEmployees(updated);
+    handleLogAction("Employees", "Delete Employee (Soft)", id, `Employee ${id} marked as deleted by ${currentUser.email}`);
+    return true;
+  };
+
+  const handleDeleteUser = (id: string): boolean => {
+    if (currentUser?.role !== "Administrator") return false;
+    const updated = users.filter(u => u.id !== id);
+    setUsers(updated);
+    saveState({ users: updated });
+    deleteRecordFromFirestore("users", id);
+    handleLogAction("Administration", "Delete User", id, `System user ${id} permanently removed`);
+    return true;
+  };
+
+  const handleDeleteHoliday = (id: string): boolean => {
+    if (currentUser?.role !== "Administrator" && currentUser?.role !== "HR Officer") return false;
+    const updated = holidays.filter(h => h.id !== id);
+    handleUpdateHolidays(updated);
+    deleteRecordFromFirestore("holidays", id);
     return true;
   };
 
@@ -696,6 +951,27 @@ export default function App() {
     handleUpdateAttendance(updated);
     syncRecordToFirestore("attendance", rec.id, rec);
   };
+  const handleDeleteAttendanceRecord = (id: string): boolean => {
+    if (currentUser?.role !== "Administrator" && currentUser?.role !== "HR Officer") return false;
+    
+    // Filter out from local state for immediate UI update
+    const updated = attendance.filter(a => a.id !== id);
+    handleUpdateAttendance(updated);
+
+    // Sync soft-delete to Firestore
+    const record = attendance.find(a => a.id === id);
+    if (record) {
+      const deletedRecord = {
+        ...record,
+        isDeleted: true,
+        deletedAt: new Date().toISOString().replace("T", " ").substring(0, 19),
+        deletedBy: currentUser.email
+      };
+      syncRecordToFirestore("attendance", id, deletedRecord);
+    }
+    handleLogAction("Attendance", "Delete Record", id, `Attendance log ${id} soft-deleted`);
+    return true;
+  };
 
   // Leaves Add
   const handleAddLeave = (rec: LeaveRecord): boolean => {
@@ -707,6 +983,25 @@ export default function App() {
     const updated = leaves.map(l => l.id === rec.id ? rec : l);
     handleUpdateLeaves(updated);
     syncRecordToFirestore("leaves", rec.id, rec);
+  };
+  const handleDeleteLeaveRecord = (id: string): boolean => {
+    if (currentUser?.role !== "Administrator" && currentUser?.role !== "HR Officer") return false;
+    
+    const updated = leaves.filter(l => l.id !== id);
+    handleUpdateLeaves(updated);
+
+    const record = leaves.find(l => l.id === id);
+    if (record) {
+      const deletedRecord = {
+        ...record,
+        isDeleted: true,
+        deletedAt: new Date().toISOString().replace("T", " ").substring(0, 19),
+        deletedBy: currentUser.email
+      };
+      syncRecordToFirestore("leaves", id, deletedRecord);
+    }
+    handleLogAction("Leave", "Delete Record", id, `Leave application ${id} soft-deleted`);
+    return true;
   };
 
   // Family Members & Medical Expenses CRUD
@@ -724,6 +1019,13 @@ export default function App() {
     const updated = familyMembers.map(item => item.id === fm.id ? fm : item);
     handleUpdateFamilyMembersState(updated);
     syncRecordToFirestore("family_members", fm.id, fm);
+  };
+  const handleDeleteFamilyMember = (id: string): boolean => {
+    if (currentUser?.role !== "Administrator" && currentUser?.role !== "HR Officer") return false;
+    const updated = familyMembers.filter(f => f.id !== id);
+    handleUpdateFamilyMembersState(updated);
+    deleteRecordFromFirestore("family_members", id);
+    return true;
   };
 
   const handleUpdateMedicalExpensesState = (newExps: MedicalExpense[]) => {
@@ -855,250 +1157,339 @@ export default function App() {
           <div className="lg:col-span-6 bg-white p-8 lg:p-16 flex flex-col justify-center min-h-[500px]">
             <div className="max-w-md w-full mx-auto space-y-6">
               
-              {/* Header Title & Subtitle */}
-              <div>
-                <h2 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
-                  {loginMode === "login" ? "Welcome Back" : "Operator Registration"}
-                </h2>
-                <p className="text-xs lg:text-sm text-slate-500 font-medium mt-1">
-                  {loginMode === "login"
-                    ? "Sign in to access your ETRHRMS account."
-                    : "Register your operator account with verified @ethiopianre.com email."}
-                </p>
-              </div>
+              {/* If registration completed, show Registration Success view exclusively */}
+              {regCompleted ? (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 md:p-8 space-y-6 animate-in fade-in zoom-in-95 duration-200 text-center">
+                  <div className="mx-auto h-14 w-14 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-sm">
+                    <CheckCircle2 className="h-8 w-8" />
+                  </div>
 
-              {/* Status Alerts */}
-              {loginError && (
-                <div className="p-4 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl text-xs font-semibold space-y-2 animate-in fade-in duration-150">
-                  <p className="leading-tight">{loginError}</p>
-                  {loginError.includes("verified") && (
-                    <div className="pt-2 border-t border-rose-200/60 flex flex-col gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => alert(`Simulated Notice: Resent email verification link to ${loginEmail}`)}
-                        className="w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] rounded-lg uppercase tracking-wider transition-all"
-                      >
-                        Resend Verification Email
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSimulateInstantVerification(loginEmail)}
-                        className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg uppercase tracking-wider transition-all"
-                      >
-                        ⚡ Simulate Instant Verification (Review Helper)
-                      </button>
+                  <div className="space-y-2">
+                    <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
+                      Registration Successful!
+                    </h3>
+                    <p className="text-xs md:text-sm text-slate-600 leading-relaxed font-medium">
+                      Your account has been created. A verification link has been sent to your official Ethiopian Reinsurance email address. Please verify your email before logging in.
+                    </p>
+                  </div>
+
+                  {regCompletedEmail && (
+                    <div className="p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 break-all shadow-xs">
+                      {regCompletedEmail}
                     </div>
                   )}
-                </div>
-              )}
 
-              {regSuccessMessage && (
-                <div className="p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold space-y-2 animate-in fade-in duration-150">
-                  <p className="leading-tight">{regSuccessMessage}</p>
-                  <div className="pt-2 border-t border-emerald-200/60">
-                    <button
-                      type="button"
-                      onClick={() => handleSimulateInstantVerification(regEmail || loginEmail)}
-                      className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg uppercase tracking-wider transition-all"
-                    >
-                      ⚡ Simulate Instant Verification for Registered Email
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {loginMode === "login" ? (
-                /* --- LOGIN FORM --- */
-                <form onSubmit={handleLoginSubmit} className="space-y-5">
-                  {/* Email Address */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
-                      Company Email Address
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-                      <input
-                        type="email"
-                        placeholder="e.g. employee@ethiopianre.com"
-                        value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] focus:border-transparent text-slate-800 font-medium transition-all"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Password */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
-                      Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-                      <input
-                        type={showLoginPassword ? "text" : "password"}
-                        placeholder="Enter password"
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        className="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] focus:border-transparent text-slate-800 font-medium transition-all"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowLoginPassword(!showLoginPassword)}
-                        className="absolute right-3.5 top-2.5 p-0.5 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
-                        title={showLoginPassword ? "Hide Password" : "Show Password"}
-                      >
-                        {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Remember Me & Forgot Password Row */}
-                  <div className="flex items-center justify-between text-xs pt-1">
-                    <label className="flex items-center gap-2 cursor-pointer text-slate-600 font-medium select-none">
-                      <input
-                        type="checkbox"
-                        checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
-                        className="rounded border-slate-300 text-[#002B5B] focus:ring-[#002B5B]"
-                      />
-                      <span>Remember Me</span>
-                    </label>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setResetEmail(loginEmail);
-                        setResetStatus(null);
-                        setForgotPasswordModal(true);
-                      }}
-                      className="text-xs font-extrabold text-[#002B5B] hover:underline"
-                    >
-                      Forgot Password?
-                    </button>
-                  </div>
-
-                  {/* Sign In Button */}
                   <button
-                    type="submit"
-                    disabled={loginLoading}
-                    className="w-full py-3 bg-[#002B5B] hover:bg-[#001F44] text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg uppercase tracking-wider disabled:opacity-50 mt-2 cursor-pointer"
+                    type="button"
+                    onClick={() => {
+                      setRegCompleted(false);
+                      setRegCompletedEmail("");
+                      setLoginMode("login");
+                      setLoginError("");
+                    }}
+                    className="w-full py-3 bg-[#002B5B] hover:bg-[#001F44] text-white font-black text-xs rounded-xl transition-all shadow-md uppercase tracking-wider cursor-pointer"
                   >
-                    {loginLoading ? (
-                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                      <>
-                        <Key className="h-4 w-4 text-[#FED100]" />
-                        <span>Sign In to ETRHRMS</span>
-                      </>
-                    )}
+                    Back to Login
                   </button>
-
-                  {/* Register Toggle */}
-                  <div className="text-center pt-4 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLoginError("");
-                        setRegSuccessMessage("");
-                        setLoginMode("register");
-                      }}
-                      className="text-xs font-bold text-slate-600 hover:text-[#002B5B] transition-colors"
-                    >
-                      Don't have an account? <span className="text-[#002B5B] underline">Register / Sign Up here</span>
-                    </button>
-                  </div>
-                </form>
+                </div>
               ) : (
-                /* --- REGISTRATION FORM --- */
-                <form onSubmit={handleRegisterSubmit} className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">Full Name</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Almaz Bekele"
-                      value={regFullName}
-                      onChange={(e) => setRegFullName(e.target.value)}
-                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] text-slate-800 font-medium"
-                      required
-                    />
+                <>
+                  {/* Header Title & Subtitle */}
+                  <div>
+                    <h2 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
+                      {loginMode === "login" ? "Welcome Back" : "Operator Registration"}
+                    </h2>
+                    <p className="text-xs lg:text-sm text-slate-500 font-medium mt-1">
+                      {loginMode === "login"
+                        ? "Sign in to access your ETRHRMS account."
+                        : "Register your operator account with official @ethiopianre.com email."}
+                    </p>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">Company Email Address</label>
-                    <input
-                      type="email"
-                      placeholder="e.g. almaz.bekele@ethiopianre.com"
-                      value={regEmail}
-                      onChange={(e) => setRegEmail(e.target.value)}
-                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] text-slate-800 font-medium"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">Password</label>
-                    <div className="relative">
-                      <input
-                        type={showRegPassword ? "text" : "password"}
-                        placeholder="Create secure password"
-                        value={regPassword}
-                        onChange={(e) => setRegPassword(e.target.value)}
-                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] text-slate-800 font-medium"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowRegPassword(!showRegPassword)}
-                        className="absolute right-3.5 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none"
-                      >
-                        {showRegPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
+                  {/* Resend Success Message */}
+                  {resendSuccessMsg && (
+                    <div className="p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold flex items-start gap-2 animate-in fade-in duration-150">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <p className="leading-tight">{resendSuccessMsg}</p>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="space-y-1">
-                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">Confirm Password</label>
-                    <input
-                      type="password"
-                      placeholder="Re-type password"
-                      value={regConfirmPassword}
-                      onChange={(e) => setRegConfirmPassword(e.target.value)}
-                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] text-slate-800 font-medium"
-                      required
-                    />
-                  </div>
+                  {/* Login Errors / Verification Required / Duplicate Email */}
+                  {loginError && (
+                    loginError === "EMAIL_VERIFICATION_REQUIRED" ? (
+                      <div className="p-4 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-xs space-y-3 animate-in fade-in duration-150">
+                        <div className="flex items-start gap-2.5">
+                          <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <h4 className="font-extrabold text-xs text-amber-950 uppercase tracking-wide">
+                              Email Verification Required
+                            </h4>
+                            <p className="text-xs font-medium text-amber-800 leading-relaxed">
+                              Your email address has not been verified. Please check your official Ethiopian Reinsurance email inbox and click the verification link before logging in.
+                            </p>
+                          </div>
+                        </div>
 
-                  <button
-                    type="submit"
-                    disabled={regLoading}
-                    className="w-full py-3 bg-[#002B5B] hover:bg-[#001F44] text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-md uppercase tracking-wider disabled:opacity-50 cursor-pointer"
-                  >
-                    {regLoading ? (
-                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <div className="pt-2 border-t border-amber-200/70">
+                          <button
+                            type="button"
+                            onClick={handleResendVerification}
+                            disabled={resendLoading}
+                            className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-lg uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+                          >
+                            {resendLoading ? (
+                              <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <>
+                                <Mail className="h-4 w-4" />
+                                <span>Resend Verification Email</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ) : loginError === "EMAIL_ALREADY_IN_USE" ? (
+                      <div className="p-4 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-xs space-y-3 animate-in fade-in duration-150">
+                        <div className="flex items-start gap-2.5">
+                          <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <h4 className="font-extrabold text-xs text-amber-950 uppercase tracking-wide">
+                              Account Already Registered
+                            </h4>
+                            <p className="text-xs font-medium text-amber-800 leading-relaxed">
+                              This email address is already registered. Please sign in or reset your password.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-amber-200/70 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLoginError("");
+                              setLoginMode("login");
+                              if (regEmail) setLoginEmail(regEmail.trim().toLowerCase());
+                            }}
+                            className="flex-1 py-2.5 bg-[#002B5B] hover:bg-[#001F44] text-white font-black text-xs rounded-lg uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                          >
+                            <span>Back to Login</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const emailToReset = regEmail.trim().toLowerCase() || loginEmail.trim().toLowerCase();
+                              setResetEmail(emailToReset);
+                              setResetStatus(null);
+                              setForgotPasswordModal(true);
+                              setLoginError("");
+                            }}
+                            className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-lg uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                          >
+                            <span>Forgot Password</span>
+                          </button>
+                        </div>
+                      </div>
                     ) : (
-                      <>
-                        <ShieldCheck className="h-4 w-4 text-[#FED100]" />
-                        <span>Register Operator Account</span>
-                      </>
-                    )}
-                  </button>
+                      <div className="p-4 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl text-xs font-semibold leading-tight animate-in fade-in duration-150">
+                        {loginError}
+                      </div>
+                    )
+                  )}
 
-                  <div className="text-center pt-3 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLoginError("");
-                        setRegSuccessMessage("");
-                        setLoginMode("register");
-                      }}
-                      className="text-xs font-bold text-slate-600 hover:text-[#002B5B] transition-colors"
-                    >
-                      Already registered? <span className="text-[#002B5B] underline">Back to Login Screen</span>
-                    </button>
-                  </div>
-                </form>
+                  {loginMode === "login" ? (
+                    /* --- LOGIN FORM --- */
+                    <form onSubmit={handleLoginSubmit} className="space-y-5">
+                      {/* Email Address */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                          Company Email Address
+                        </label>
+                        <div className="relative">
+                          <Mail className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                          <input
+                            type="email"
+                            placeholder="e.g. employee@ethiopianre.com"
+                            value={loginEmail}
+                            onChange={(e) => setLoginEmail(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] focus:border-transparent text-slate-800 font-medium transition-all"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Password */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                          Password
+                        </label>
+                        <div className="relative">
+                          <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                          <input
+                            type={showLoginPassword ? "text" : "password"}
+                            placeholder="Enter password"
+                            value={loginPassword}
+                            onChange={(e) => setLoginPassword(e.target.value)}
+                            className="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] focus:border-transparent text-slate-800 font-medium transition-all"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowLoginPassword(!showLoginPassword)}
+                            className="absolute right-3.5 top-2.5 p-0.5 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                            title={showLoginPassword ? "Hide Password" : "Show Password"}
+                          >
+                            {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Remember Me & Forgot Password Row */}
+                      <div className="flex items-center justify-between text-xs pt-1">
+                        <label className="flex items-center gap-2 cursor-pointer text-slate-600 font-medium select-none">
+                          <input
+                            type="checkbox"
+                            checked={rememberMe}
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                            className="rounded border-slate-300 text-[#002B5B] focus:ring-[#002B5B]"
+                          />
+                          <span>Remember Me</span>
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResetEmail(loginEmail);
+                            setResetStatus(null);
+                            setForgotPasswordModal(true);
+                          }}
+                          className="text-xs font-extrabold text-[#002B5B] hover:underline cursor-pointer"
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
+
+                      {/* Sign In Button */}
+                      <button
+                        type="submit"
+                        disabled={loginLoading}
+                        className="w-full py-3 bg-[#002B5B] hover:bg-[#001F44] text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg uppercase tracking-wider disabled:opacity-50 mt-2 cursor-pointer"
+                      >
+                        {loginLoading ? (
+                          <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <>
+                            <Key className="h-4 w-4 text-[#FED100]" />
+                            <span>Sign In to ETRHRMS</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* Register Toggle */}
+                      <div className="text-center pt-4 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLoginError("");
+                            setResendSuccessMsg("");
+                            setLoginMode("register");
+                          }}
+                          className="text-xs font-bold text-slate-600 hover:text-[#002B5B] transition-colors cursor-pointer"
+                        >
+                          Don't have an account? <span className="text-[#002B5B] underline">Register / Sign Up here</span>
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    /* --- REGISTRATION FORM --- */
+                    <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">Full Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Almaz Bekele"
+                          value={regFullName}
+                          onChange={(e) => setRegFullName(e.target.value)}
+                          className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] text-slate-800 font-medium"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">Company Email Address</label>
+                        <input
+                          type="email"
+                          placeholder="e.g. almaz.bekele@ethiopianre.com"
+                          value={regEmail}
+                          onChange={(e) => setRegEmail(e.target.value)}
+                          className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] text-slate-800 font-medium"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">Password</label>
+                        <div className="relative">
+                          <input
+                            type={showRegPassword ? "text" : "password"}
+                            placeholder="Create secure password"
+                            value={regPassword}
+                            onChange={(e) => setRegPassword(e.target.value)}
+                            className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] text-slate-800 font-medium"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowRegPassword(!showRegPassword)}
+                            className="absolute right-3.5 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none"
+                          >
+                            {showRegPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">Confirm Password</label>
+                        <input
+                          type="password"
+                          placeholder="Re-type password"
+                          value={regConfirmPassword}
+                          onChange={(e) => setRegConfirmPassword(e.target.value)}
+                          className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#002B5B] text-slate-800 font-medium"
+                          required
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={regLoading}
+                        className="w-full py-3 bg-[#002B5B] hover:bg-[#001F44] text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-md uppercase tracking-wider disabled:opacity-50 cursor-pointer"
+                      >
+                        {regLoading ? (
+                          <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <>
+                            <ShieldCheck className="h-4 w-4 text-[#FED100]" />
+                            <span>Register Operator Account</span>
+                          </>
+                        )}
+                      </button>
+
+                      <div className="text-center pt-3 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLoginError("");
+                            setResendSuccessMsg("");
+                            setLoginMode("login");
+                          }}
+                          className="text-xs font-bold text-slate-600 hover:text-[#002B5B] transition-colors cursor-pointer"
+                        >
+                          Already registered? <span className="text-[#002B5B] underline">Back to Login Screen</span>
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -1194,7 +1585,8 @@ export default function App() {
         
         {/* Dynamic Navigation Sidebar */}
         <Sidebar
-          role={currentUser.role}
+          currentUser={currentUser}
+          rolePermissions={rolePermissions.find(p => p.roleId === currentUser.role)}
           activeTab={activeTab}
           onTabChange={(tabId) => {
             // Direct mapping of settings subtabs from sidebar triggers
@@ -1221,6 +1613,7 @@ export default function App() {
               attendance={attendance}
               users={users}
               logs={logs}
+              currentUser={currentUser}
               role={currentUser.role}
               onNavigate={(tabId) => {
                 if (["profile", "branding", "holidays", "users", "roles", "logs"].includes(tabId)) {
@@ -1250,6 +1643,7 @@ export default function App() {
               onAddEmployee={handleAddEmployee}
               onAddEmployeesBulk={handleAddEmployeesBulk}
               onUpdateEmployee={handleUpdateEmployee}
+              onDeleteEmployee={handleDeleteEmployee}
               onAddFamilyMember={handleAddFamilyMember}
               onLogAction={handleLogAction}
             />
@@ -1275,6 +1669,7 @@ export default function App() {
               currentUser={currentUser}
               onAddAttendance={handleAddAttendance}
               onUpdateAttendance={handleUpdateAttendanceRecord}
+              onDeleteAttendance={handleDeleteAttendanceRecord}
               onLogAction={handleLogAction}
             />
           )}
@@ -1290,6 +1685,7 @@ export default function App() {
               initialSubTab={activeTab.includes("_") ? activeTab.split("_")[1] : "dashboard"}
               onAddLeave={handleAddLeave}
               onUpdateLeave={handleUpdateLeaveRecord}
+              onDeleteLeave={handleDeleteLeaveRecord}
               onUpdateConfig={handleUpdateConfig}
               onLogAction={handleLogAction}
             />
@@ -1306,6 +1702,7 @@ export default function App() {
               initialSubTab={activeTab.includes("_") ? activeTab.split("_")[1] : "dashboard"}
               onAddFamilyMember={handleAddFamilyMember}
               onUpdateFamilyMember={handleUpdateFamilyMember}
+              onDeleteFamilyMember={handleDeleteFamilyMember}
               onAddMedicalExpense={handleAddMedicalExpense}
               onUpdateMedicalExpense={handleUpdateMedicalExpense}
               onDeleteMedicalExpense={handleDeleteMedicalExpense}
@@ -1347,6 +1744,10 @@ export default function App() {
               onUpdateImportLogs={handleUpdatePayrollImportLogs}
               onUpdateSettings={handleUpdatePayrollSettings}
               onUpdateEmailLogs={handleUpdateEmailLogs}
+              onDeleteComponent={handleDeleteSalaryComponent}
+              onDeletePeriod={handleDeletePayrollPeriod}
+              onDeleteRecord={handleDeletePayrollRecord}
+              onDeletePayslip={handleDeletePayslip}
               onLogAction={handleLogAction}
             />
           )}
@@ -1364,6 +1765,8 @@ export default function App() {
               onUpdateConfig={handleUpdateConfig}
               onUpdateUsers={handleUpdateUsers}
               onUpdateHolidays={handleUpdateHolidays}
+              onDeleteHoliday={handleDeleteHoliday}
+              onDeleteUser={handleDeleteUser}
               onUpdateEmailLogs={handleUpdateEmailLogs}
               onLogAction={handleLogAction}
             />

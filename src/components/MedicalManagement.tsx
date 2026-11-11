@@ -24,6 +24,7 @@ interface MedicalManagementProps {
   onDeleteMedicalExpense: (id: string) => void;
   onAddFamilyMember: (record: FamilyMember) => boolean;
   onUpdateFamilyMember: (record: FamilyMember) => void;
+  onDeleteFamilyMember?: (id: string) => boolean;
   onUpdateConfig: (config: CompanyConfig) => void;
   onLogAction: (module: string, action: string, record: string, details: string) => void;
 }
@@ -41,6 +42,7 @@ export default function MedicalManagement({
   onDeleteMedicalExpense,
   onAddFamilyMember,
   onUpdateFamilyMember,
+  onDeleteFamilyMember,
   onUpdateConfig,
   onLogAction
 }: MedicalManagementProps) {
@@ -68,12 +70,20 @@ export default function MedicalManagement({
     };
   }, [companyConfig]);
 
-  const activeEmployees = useMemo(() => employees.filter(e => e.status === "Active"), [employees]);
+  const activeEmployees = useMemo(() => employees.filter(e => {
+    if (e.status !== "Active") return false;
+    if (currentUser?.role === "Employee") {
+      return e.email.toLowerCase() === currentUser.email.toLowerCase() || e.employeeId === currentUser.employeeId;
+    }
+    return true;
+  }), [employees, currentUser]);
 
   // Calculate per-employee medical summary (Employee Expenses, Family Expenses, Remaining Allocation)
   const employeeMedicalSummaries = useMemo(() => {
     const defaultAllocation = medicalPolicy.defaultFamilyAllocationETB || 100000;
+    const isEmployee = currentUser?.role === "Employee";
     return activeEmployees.map(emp => {
+      if (isEmployee && emp.employeeId !== currentUser?.employeeId) return null;
       const empExpenses = medicalExpenses
         .filter(m => m.employeeId === emp.employeeId && m.beneficiaryType === "Employee")
         .reduce((sum, m) => sum + (m.amountETB || 0), 0);
@@ -99,21 +109,32 @@ export default function MedicalManagement({
         isOverdrawn,
         activeFamilyCount: empFamilyMembers.length
       };
-    });
-  }, [activeEmployees, medicalExpenses, familyMembers, medicalPolicy]);
+    }).filter(Boolean) as any[];
+  }, [activeEmployees, medicalExpenses, familyMembers, medicalPolicy, currentUser]);
 
   // Total organization-wide medical metrics
   const totalMetrics = useMemo(() => {
-    const totalEmpMedical = medicalExpenses
+    const isEmployee = currentUser?.role === "Employee";
+    const myEmpId = currentUser?.employeeId;
+
+    const filteredExpenses = isEmployee 
+      ? medicalExpenses.filter(m => m.employeeId === myEmpId)
+      : medicalExpenses;
+
+    const filteredFamilyMembers = isEmployee
+      ? familyMembers.filter(f => f.employeeId === myEmpId)
+      : familyMembers;
+
+    const totalEmpMedical = filteredExpenses
       .filter(m => m.beneficiaryType === "Employee")
       .reduce((sum, m) => sum + (m.amountETB || 0), 0);
 
-    const totalFamilyMedical = medicalExpenses
+    const totalFamilyMedical = filteredExpenses
       .filter(m => m.beneficiaryType === "Family Member")
       .reduce((sum, m) => sum + (m.amountETB || 0), 0);
 
     const totalCombined = totalEmpMedical + totalFamilyMedical;
-    const totalFamilyAllocated = activeEmployees.length * (medicalPolicy.defaultFamilyAllocationETB || 100000);
+    const totalFamilyAllocated = (isEmployee ? 1 : activeEmployees.length) * (medicalPolicy.defaultFamilyAllocationETB || 100000);
     const totalFamilyRemaining = Math.max(0, totalFamilyAllocated - totalFamilyMedical);
 
     return {
@@ -122,9 +143,9 @@ export default function MedicalManagement({
       totalCombined,
       totalFamilyAllocated,
       totalFamilyRemaining,
-      activeFamilyMembersCount: familyMembers.filter(f => f.status === "Active").length
+      activeFamilyMembersCount: filteredFamilyMembers.filter(f => f.status === "Active").length
     };
-  }, [medicalExpenses, familyMembers, activeEmployees, medicalPolicy]);
+  }, [medicalExpenses, familyMembers, activeEmployees, medicalPolicy, currentUser]);
 
   // ==========================================
   // CLAIMS REGISTER STATE & MODALS
@@ -648,14 +669,22 @@ export default function MedicalManagement({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {medicalExpenses.length === 0 ? (
+                    {medicalExpenses.filter(m => {
+                      const isEmployee = currentUser?.role === "Employee";
+                      const isMyRecord = !isEmployee || m.employeeId === currentUser?.employeeId;
+                      return isMyRecord;
+                    }).length === 0 ? (
                       <tr>
                         <td colSpan={4} className="p-8 text-center text-slate-400 font-medium">
                           No medical expense claims logged yet.
                         </td>
                       </tr>
                     ) : (
-                      medicalExpenses.slice(0, 5).map(m => (
+                      medicalExpenses.filter(m => {
+                        const isEmployee = currentUser?.role === "Employee";
+                        const isMyRecord = !isEmployee || m.employeeId === currentUser?.employeeId;
+                        return isMyRecord;
+                      }).slice(0, 5).map(m => (
                         <tr key={m.id} className="hover:bg-slate-50/50">
                           <td className="p-3">
                             <span className="font-bold text-slate-800 block">{m.employeeName}</span>
@@ -775,6 +804,13 @@ export default function MedicalManagement({
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {medicalExpenses.filter(m => {
+                    if (currentUser?.role === "Employee") {
+                      const myEmp = employees.find(e => e.email.toLowerCase() === currentUser.email.toLowerCase());
+                      const isMyRecord = (myEmp && m.employeeId === myEmp.employeeId) || 
+                                         (currentUser.employeeId && m.employeeId === currentUser.employeeId) ||
+                                         m.recordedBy === currentUser.email;
+                      if (!isMyRecord) return false;
+                    }
                     const matchSearch = 
                       m.employeeName.toLowerCase().includes(claimSearchTerm.toLowerCase()) ||
                       m.employeeId.toLowerCase().includes(claimSearchTerm.toLowerCase()) ||
@@ -791,6 +827,13 @@ export default function MedicalManagement({
                     </tr>
                   ) : (
                     medicalExpenses.filter(m => {
+                      if (currentUser?.role === "Employee") {
+                        const myEmp = employees.find(e => e.email.toLowerCase() === currentUser.email.toLowerCase());
+                        const isMyRecord = (myEmp && m.employeeId === myEmp.employeeId) || 
+                                           (currentUser.employeeId && m.employeeId === currentUser.employeeId) ||
+                                           m.recordedBy === currentUser.email;
+                        if (!isMyRecord) return false;
+                      }
                       const matchSearch = 
                         m.employeeName.toLowerCase().includes(claimSearchTerm.toLowerCase()) ||
                         m.employeeId.toLowerCase().includes(claimSearchTerm.toLowerCase()) ||
@@ -941,6 +984,12 @@ export default function MedicalManagement({
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {familyMembers.filter(f => {
+                    if (currentUser?.role === "Employee") {
+                      const myEmp = employees.find(e => e.email.toLowerCase() === currentUser.email.toLowerCase());
+                      const isMyRecord = (myEmp && f.employeeId === myEmp.employeeId) || 
+                                         (currentUser.employeeId && f.employeeId === currentUser.employeeId);
+                      if (!isMyRecord) return false;
+                    }
                     const emp = employees.find(e => e.employeeId === f.employeeId);
                     const matchSearch = 
                       f.fullName.toLowerCase().includes(famSearchTerm.toLowerCase()) ||
@@ -957,6 +1006,12 @@ export default function MedicalManagement({
                     </tr>
                   ) : (
                     familyMembers.filter(f => {
+                      if (currentUser?.role === "Employee") {
+                        const myEmp = employees.find(e => e.email.toLowerCase() === currentUser.email.toLowerCase());
+                        const isMyRecord = (myEmp && f.employeeId === myEmp.employeeId) || 
+                                           (currentUser.employeeId && f.employeeId === currentUser.employeeId);
+                        if (!isMyRecord) return false;
+                      }
                       const emp = employees.find(e => e.employeeId === f.employeeId);
                       const matchSearch = 
                         f.fullName.toLowerCase().includes(famSearchTerm.toLowerCase()) ||
@@ -1023,6 +1078,17 @@ export default function MedicalManagement({
                                   title={f.status === "Active" ? "Deactivate" : "Activate"}
                                 >
                                   <ShieldAlert className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Are you sure you want to delete family member ${f.fullName}?`)) {
+                                      onDeleteFamilyMember && onDeleteFamilyMember(f.id);
+                                    }
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-rose-700 hover:bg-rose-50 rounded"
+                                  title="Delete Record"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </>
                             ) : (

@@ -3,7 +3,7 @@ import { Employee, Department, User, FamilyMember } from "../types";
 import { 
   Plus, Search, SlidersHorizontal, Eye, Edit, UserX, UserCheck, 
   X, Save, FileSpreadsheet, Printer, Download, EyeOff, FileText, ExternalLink, Heart,
-  Upload, CheckCircle2, AlertCircle, FileUp, RefreshCw
+  Upload, CheckCircle2, AlertCircle, FileUp, RefreshCw, Trash2
 } from "lucide-react";
 
 interface ParsedImportRow {
@@ -48,6 +48,7 @@ interface EmployeesProps {
   onAddEmployee: (emp: Employee) => boolean;
   onAddEmployeesBulk?: (emps: Employee[]) => Promise<{ successCount: number; failCount: number; failedErrors: string[] }>;
   onUpdateEmployee: (emp: Employee) => void;
+  onDeleteEmployee?: (id: string) => boolean;
   onAddFamilyMember?: (fm: FamilyMember) => boolean;
   onLogAction: (module: string, action: string, record: string, details: string) => void;
 }
@@ -60,6 +61,7 @@ export default function Employees({
   onAddEmployee,
   onAddEmployeesBulk,
   onUpdateEmployee,
+  onDeleteEmployee,
   onAddFamilyMember,
   onLogAction
 }: EmployeesProps) {
@@ -322,6 +324,26 @@ export default function Employees({
       emp.employeeId,
       `Toggled status of ${emp.fullName} to ${nextStatus}`
     );
+  };
+
+  const handleDeleteClick = (emp: Employee) => {
+    if (currentUser?.role !== "Administrator" && currentUser?.role !== "HR Officer") {
+      alert("Role Restriction: You do not have permission to delete employee records.");
+      return;
+    }
+
+    const confirmMsg = `Are you sure you want to delete employee: ${emp.fullName} (${emp.employeeId})?\n\nThis will mark the record as deleted and archive it for audit purposes. This action is auditable.`;
+    
+    if (window.confirm(confirmMsg)) {
+      if (onDeleteEmployee) {
+        const ok = onDeleteEmployee(emp.employeeId);
+        if (ok) {
+          alert("Employee record has been successfully archived/deleted.");
+        } else {
+          alert("Error: Could not delete record. Please check permissions or system logs.");
+        }
+      }
+    }
   };
 
   // Download CSV Import Template
@@ -622,6 +644,138 @@ export default function Employees({
     document.body.removeChild(link);
   };
 
+  if (currentUser?.role === "Employee") {
+    const myEmp = employees.find(e => 
+      e.email.toLowerCase() === currentUser.email.toLowerCase() || 
+      (currentUser.employeeId && e.employeeId === currentUser.employeeId)
+    );
+
+    if (!myEmp) {
+      return (
+        <div className="p-8 bg-amber-50 border border-amber-200 rounded-2xl text-center space-y-4 max-w-md mx-auto my-12 animate-in fade-in duration-200">
+          <AlertCircle className="h-12 w-12 text-amber-600 mx-auto" />
+          <h3 className="text-base font-extrabold text-amber-950">No Matching Employee Record Found</h3>
+          <p className="text-xs font-medium text-amber-800 leading-relaxed">
+            No employee record is currently linked to your registered email address ({currentUser.email}). Please contact HR Administration to link your employee profile.
+          </p>
+        </div>
+      );
+    }
+
+    const dept = departments.find(d => d.id === myEmp.departmentId);
+    const myFamily = familyMembers.filter(f => f.employeeId === myEmp.employeeId);
+
+    return (
+      <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in duration-200">
+        <div className="bg-gradient-to-r from-[#002B5B] to-[#001F44] text-white p-6 rounded-2xl shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="h-16 w-16 rounded-full bg-[#FED100] text-[#002B5B] flex items-center justify-center font-black text-xl border-2 border-white/40 shadow-inner">
+              {myEmp.firstName.charAt(0)}{myEmp.lastName.charAt(0)}
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-white">{myEmp.fullName}</h2>
+              <p className="text-xs text-[#FED100] font-bold mt-0.5">{myEmp.position} • {dept?.name || myEmp.departmentId}</p>
+              <div className="flex items-center gap-3 text-[11px] text-slate-300 font-medium mt-1">
+                <span>ID: {myEmp.employeeId}</span>
+                <span>•</span>
+                <span>Email: {myEmp.email}</span>
+              </div>
+            </div>
+          </div>
+
+          <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+            {myEmp.status} Employee
+          </span>
+        </div>
+
+        {/* Detailed Profile Sections */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Personal Information */}
+          <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3 shadow-2xs">
+            <h3 className="font-extrabold text-xs uppercase tracking-wider text-[#002B5B] border-b pb-2">
+              Personal Information
+            </h3>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500 font-medium">Full Name</span>
+                <span className="font-bold text-slate-800">{myEmp.fullName}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500 font-medium">Gender</span>
+                <span className="font-bold text-slate-800">{myEmp.gender}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500 font-medium">Date of Birth</span>
+                <span className="font-bold text-slate-800">{myEmp.dob}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500 font-medium">Phone Number</span>
+                <span className="font-bold text-slate-800">{myEmp.phoneNumber}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-slate-500 font-medium">Address</span>
+                <span className="font-bold text-slate-800">{myEmp.address}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Employment Details */}
+          <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3 shadow-2xs">
+            <h3 className="font-extrabold text-xs uppercase tracking-wider text-[#002B5B] border-b pb-2">
+              Employment Details
+            </h3>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500 font-medium">Department</span>
+                <span className="font-bold text-slate-800">{dept?.name || myEmp.departmentId}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500 font-medium">Position / Title</span>
+                <span className="font-bold text-slate-800">{myEmp.position}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500 font-medium">Employment Type</span>
+                <span className="font-bold text-slate-800">{myEmp.employmentType}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500 font-medium">Date of Hire</span>
+                <span className="font-bold text-slate-800">{myEmp.hireDate}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-slate-500 font-medium">Status</span>
+                <span className="font-bold text-emerald-700">{myEmp.status}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Registered Family Members */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3 shadow-2xs">
+          <h3 className="font-extrabold text-xs uppercase tracking-wider text-[#002B5B] border-b pb-2">
+            Registered Family Dependents ({myFamily.length})
+          </h3>
+          {myFamily.length === 0 ? (
+            <p className="text-xs text-slate-400 font-medium py-2">No family dependents registered.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {myFamily.map(f => (
+                <div key={f.id} className="p-3 bg-slate-50 border rounded-lg text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800">{f.fullName}</span>
+                    <span className="px-2 py-0.5 bg-primary-custom/10 text-[#002B5B] font-extrabold text-[10px] rounded">
+                      {f.relationship}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium">DOB: {f.dob} • Gender: {f.gender}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header and Add Button */}
@@ -809,6 +963,13 @@ export default function Employees({
                               title={emp.status === "Active" ? "Deactivate Employee" : "Reactivate Employee"}
                             >
                               {emp.status === "Active" ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClick(emp)}
+                              className="p-1 text-slate-400 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-colors inline-block"
+                              title="Delete Record (Archive)"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </>
                         )}

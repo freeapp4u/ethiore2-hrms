@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { AttendanceRecord, Employee, Department, User } from "../types";
 import { 
   Plus, Search, Edit, Clock, Calendar, Check, X, Save, 
-  FileSpreadsheet, Printer, Filter, BookOpen 
+  FileSpreadsheet, Printer, Filter, BookOpen, Trash2 
 } from "lucide-react";
 
 interface AttendanceProps {
@@ -12,6 +12,7 @@ interface AttendanceProps {
   currentUser: User | null;
   onAddAttendance: (record: AttendanceRecord) => boolean;
   onUpdateAttendance: (record: AttendanceRecord) => void;
+  onDeleteAttendance?: (id: string) => boolean;
   onLogAction: (module: string, action: string, record: string, details: string) => void;
 }
 
@@ -22,6 +23,7 @@ export default function Attendance({
   currentUser,
   onAddAttendance,
   onUpdateAttendance,
+  onDeleteAttendance,
   onLogAction
 }: AttendanceProps) {
   // Filter States
@@ -50,6 +52,11 @@ export default function Attendance({
   const activeEmployees = employees.filter(e => e.status === "Active");
 
   const filteredAttendance = attendance.filter(rec => {
+    if (currentUser?.role === "Employee") {
+      const isMyRecord = (currentUser.employeeId && rec.employeeId === currentUser.employeeId);
+      if (!isMyRecord) return false;
+    }
+
     const emp = employees.find(e => e.employeeId === rec.employeeId);
     const empName = emp ? emp.fullName.toLowerCase() : "";
     
@@ -413,13 +420,26 @@ export default function Attendance({
                       </td>
                       <td className="px-6 py-3.5 text-right whitespace-nowrap">
                         {currentUser?.role !== "Auditor" && (
-                          <button
-                            onClick={() => handleOpenEdit(rec)}
-                            className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-50 rounded-md transition-colors"
-                            title="Correct Entry"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleOpenEdit(rec)}
+                              className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-50 rounded-md transition-colors"
+                              title="Correct Entry"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Are you sure you want to delete this attendance log for ${empName} on ${rec.date}?`)) {
+                                  onDeleteAttendance && onDeleteAttendance(rec.id);
+                                }
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                              title="Delete Log"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
                         )}
                       </td>
                     </tr>

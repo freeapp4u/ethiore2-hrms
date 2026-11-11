@@ -1,8 +1,41 @@
-export type UserRole = "Administrator" | "HR Officer" | "Auditor";
+export type UserRole = string; // Changed from union to string to support dynamic roles
 export type AccountStatus = "Active" | "Inactive" | "Suspended" | "Pending Verification";
 export type EmploymentStatus = "Active" | "Inactive";
 export type AttendanceStatus = "Present" | "Absent" | "Late" | "On Leave" | "Half Day" | "Other";
 export type LeaveStatus = "Active" | "Completed" | "Cancelled";
+
+export interface ActionPermissions {
+  view: boolean;
+  create: boolean;
+  edit: boolean;
+  delete: boolean;
+  approve: boolean;
+  export: boolean;
+}
+
+export interface ModulePermission {
+  enabled: boolean;
+  actions: ActionPermissions;
+  submenus: { [submenuId: string]: boolean };
+}
+
+export interface RolePermissions {
+  id: string; // Document ID (usually same as roleId)
+  roleId: string; // Reference to SystemRole.id
+  modulePermissions: { [moduleId: string]: ModulePermission };
+  updatedBy: string;
+  updatedAt: string;
+}
+
+export interface SystemRole {
+  id: string;
+  name: string;
+  description: string;
+  status: "Active" | "Inactive";
+  isSystem?: boolean; // True for default roles like Administrator
+  createdDate: string;
+  updatedDate: string;
+}
 
 export interface User {
   id: string;
@@ -51,6 +84,9 @@ export interface Employee {
   createdBy: string;
   updatedDate: string;
   updatedBy: string;
+  isDeleted?: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
 }
 
 export interface AttendanceRecord {
@@ -66,6 +102,9 @@ export interface AttendanceRecord {
   recordedBy: string; // Name/Email of HR Officer/Admin
   createdDate: string;
   updatedDate: string;
+  isDeleted?: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
 }
 
 export interface LeaveRecord {
@@ -84,6 +123,9 @@ export interface LeaveRecord {
   recordedBy: string;
   createdDate: string;
   updatedDate: string;
+  isDeleted?: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
 }
 
 export interface LeaveTypeConfig {
@@ -196,14 +238,34 @@ export interface CompanyProfile {
   description: string;
 }
 
+export interface EmailNotificationToggles {
+  authAlerts: boolean;
+  employeeEvents: boolean;
+  leaveWorkflow: boolean;
+  payrollPayslips: boolean;
+  securityAlerts: boolean;
+}
+
 export interface EmailSettingsConfig {
   enableEmployeeEmails: boolean;
-  smtpHost: string;
-  smtpPort: number;
-  smtpUser: string;
-  smtpSenderEmail: string;
-  smtpSenderName: string;
+  provider: string; // "Microsoft 365 Exchange Online"
+  mailboxType: string; // "Shared Mailbox"
+  smtpHost: string; // "smtp.office365.com"
+  smtpPort: number; // 587
+  encryption: string; // "STARTTLS (TLS 1.2+)"
+  authMechanism: string; // "OAuth 2.0 (XOAUTH2)"
+  authFlow: string; // "Microsoft Entra ID Client Credentials Flow"
+  smtpSenderEmail: string; // "tilahun_hr_officer@ethiopianre.com"
+  smtpSenderName: string; // "Ethiopian Reinsurance HRMS"
+  smtpUser?: string;
   useTlsSsl: boolean;
+  m365TenantId?: string;
+  m365ClientId?: string;
+  m365ClientSecretConfigured?: boolean;
+  m365ConnectionStatus: "Pending Entra ID Administrator Setup" | "Connected" | "Error" | "Not Configured";
+  lastTestTimestamp?: string;
+  lastTestResult?: string;
+  notificationToggles?: EmailNotificationToggles;
   updatedBy?: string;
   updatedDate?: string;
 }
@@ -212,12 +274,26 @@ export interface EmailActivityLog {
   id: string;
   recipientEmployeeId?: string;
   recipientEmail: string;
+  senderEmail?: string;
   subject: string;
-  sendingModule: string;
+  sendingModule: string; // Notification category / module
   dateTime: string;
-  deliveryStatus: "Sent" | "Failed" | "Blocked – Email Sending Disabled";
+  deliveryStatus: "Pending" | "Processing" | "Sent" | "Failed" | "Retrying" | "Blocked – Email Sending Disabled";
   failureReason?: string;
+  relatedRecordId?: string;
+  retryCount?: number;
   triggeredBy: string;
+}
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  code: string;
+  category: "Authentication" | "Employee Management" | "Leave Management" | "Payroll" | "Administration";
+  subject: string;
+  description: string;
+  bodyHtml: string;
+  updatedAt: string;
 }
 
 export interface CompanyConfig {
@@ -228,6 +304,7 @@ export interface CompanyConfig {
   leaveYearConfig?: LeaveYearConfig;
   medicalPolicyConfig?: MedicalPolicyConfig;
   emailSettings?: EmailSettingsConfig;
+  emailTemplates?: EmailTemplate[];
 }
 
 export type RelationshipType = "Spouse" | "Child" | "Parent" | "Dependent" | "Other";
@@ -407,6 +484,9 @@ export interface PayrollRecord {
   isImported?: boolean;
   calculatedDate: string;
   calculatedBy: string;
+  isDeleted?: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
 }
 
 export interface Payslip {

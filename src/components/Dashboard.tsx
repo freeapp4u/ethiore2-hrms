@@ -10,6 +10,7 @@ interface DashboardProps {
   leaves: LeaveRecord[];
   users: User[];
   logs: ActivityLog[];
+  currentUser: User | null;
   role: UserRole;
   onNavigate: (tabId: string) => void;
   onOpenQuickAddEmployee: () => void;
@@ -24,6 +25,7 @@ export default function Dashboard({
   leaves,
   users,
   logs,
+  currentUser,
   role,
   onNavigate,
   onOpenQuickAddEmployee,
@@ -34,27 +36,35 @@ export default function Dashboard({
   // Calculate today's date in YYYY-MM-DD
   const todayStr = "2026-09-04"; // Seeding date matching local timezone or local timestamp in seed data
   
-  // Basic metrics
-  const activeEmployees = employees.filter(e => e.status === "Active");
+  // Today's attendance counters
+  const todayAttendance = attendance.filter(a => a.date === todayStr);
+  
+  // Role-based filtering for metrics and lists
+  const isEmployee = role === "Employee";
+  const myEmpId = currentUser?.employeeId;
+
+  const displayEmployees = isEmployee ? employees.filter(e => e.employeeId === myEmpId) : employees;
+  const displayAttendance = isEmployee ? attendance.filter(a => a.employeeId === myEmpId) : attendance;
+  const displayLeaves = isEmployee ? leaves.filter(l => l.employeeId === myEmpId) : leaves;
+
+  const activeEmployees = displayEmployees.filter(e => e.status === "Active");
   const totalEmployeesCount = activeEmployees.length;
   const activeDepartmentsCount = departments.filter(d => d.status === "Active").length;
   
-  // Today's attendance counters
-  const todayAttendance = attendance.filter(a => a.date === todayStr);
-  const presentTodayCount = todayAttendance.filter(a => a.status === "Present" || a.status === "Late" || a.status === "Half Day").length;
-  const leaveTodayCount = todayAttendance.filter(a => a.status === "On Leave").length;
+  const todayDisplayAttendance = todayAttendance.filter(a => !isEmployee || a.employeeId === myEmpId);
+  const presentTodayCount = todayDisplayAttendance.filter(a => a.status === "Present" || a.status === "Late" || a.status === "Half Day").length;
+  const leaveTodayCount = todayDisplayAttendance.filter(a => a.status === "On Leave").length;
   
-  // An employee is considered absent today if they are active, not checked in, and not on leave.
-  const checkedInIds = new Set(todayAttendance.map(a => a.employeeId));
+  const checkedInIds = new Set(todayDisplayAttendance.map(a => a.employeeId));
   const absentTodayCount = activeEmployees.filter(e => !checkedInIds.has(e.employeeId)).length;
 
   // Recent attendance
-  const recentAttendance = [...attendance]
+  const recentAttendance = [...displayAttendance]
     .sort((a, b) => b.createdDate.localeCompare(a.createdDate))
     .slice(0, 5);
 
   // Recent leaves
-  const recentLeaves = [...leaves]
+  const recentLeaves = [...displayLeaves]
     .sort((a, b) => b.createdDate.localeCompare(a.createdDate))
     .slice(0, 5);
 

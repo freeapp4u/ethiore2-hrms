@@ -50,6 +50,10 @@ interface PayrollManagementProps {
   onUpdateImportLogs: (logs: PayrollImportLog[]) => void;
   onUpdateSettings: (settings: PayrollSettings) => void;
   onUpdateEmailLogs?: (logs: EmailActivityLog[]) => void;
+  onDeleteComponent?: (id: string) => boolean;
+  onDeletePeriod?: (id: string) => boolean;
+  onDeleteRecord?: (id: string) => boolean;
+  onDeletePayslip?: (id: string) => boolean;
   onLogAction: (module: string, action: string, record: string, details: string) => void;
 }
 
@@ -82,6 +86,10 @@ export default function PayrollManagement({
   onUpdateImportLogs,
   onUpdateSettings,
   onUpdateEmailLogs,
+  onDeleteComponent,
+  onDeletePeriod,
+  onDeleteRecord,
+  onDeletePayslip,
   onLogAction
 }: PayrollManagementProps) {
   // Navigation Subtab state (dashboard, config, salary_setup, processing, approval, payslips, csv_import, csv_export, reports, history)
@@ -137,13 +145,23 @@ export default function PayrollManagement({
 
   // Active employees eligible for payroll
   const activeEmployees = useMemo(() => {
-    return employees.filter(e => e.status === "Active");
-  }, [employees]);
+    const isEmployee = currentUser?.role === "Employee";
+    return employees.filter(e => {
+      if (e.status !== "Active") return false;
+      if (isEmployee) return e.employeeId === currentUser?.employeeId;
+      return true;
+    });
+  }, [employees, currentUser]);
 
   // Current Period Payroll Records
   const currentPeriodRecords = useMemo(() => {
-    return payrollRecords.filter(r => r.payrollPeriodId === selectedPeriod.id);
-  }, [payrollRecords, selectedPeriod]);
+    const isEmployee = currentUser?.role === "Employee";
+    return payrollRecords.filter(r => {
+      const matchPeriod = r.payrollPeriodId === selectedPeriod.id;
+      const isMyRecord = !isEmployee || r.employeeId === currentUser?.employeeId;
+      return matchPeriod && isMyRecord;
+    });
+  }, [payrollRecords, selectedPeriod, currentUser]);
 
   // Summary Metrics for selected period
   const periodSummary = useMemo(() => {
@@ -1200,16 +1218,18 @@ export default function PayrollManagement({
       <div className="bg-white border-b border-slate-200 rounded-xl p-1 shadow-2xs flex items-center gap-1 overflow-x-auto text-xs font-bold">
         {[
           { id: "dashboard", label: "1. Dashboard", icon: TrendingUp },
-          { id: "config", label: "2. Configuration", icon: Sliders },
-          { id: "salary_setup", label: "3. Employee Salary Setup", icon: Users },
-          { id: "processing", label: "4. Payroll Processing", icon: Calculator },
-          { id: "approval", label: "5. Payroll Approval", icon: ShieldCheck },
+          { id: "config", label: "2. Configuration", icon: Sliders, adminOnly: true },
+          { id: "salary_setup", label: "3. Employee Salary Setup", icon: Users, hrOnly: true },
+          { id: "processing", label: "4. Payroll Processing", icon: Calculator, hrOnly: true },
+          { id: "approval", label: "5. Payroll Approval", icon: ShieldCheck, adminOnly: true },
           { id: "payslips", label: "6. Payslip Management", icon: FileText },
-          { id: "csv_import", label: "7. CSV Import", icon: Upload },
-          { id: "csv_export", label: "8. CSV Export", icon: Download },
-          { id: "reports", label: "9. Payroll Reports", icon: FileSpreadsheet },
-          { id: "history", label: "10. Payroll History", icon: History }
+          { id: "csv_import", label: "7. CSV Import", icon: Upload, hrOnly: true },
+          { id: "csv_export", label: "8. CSV Export", icon: Download, hrOnly: true },
+          { id: "reports", label: "9. Payroll Reports", icon: FileSpreadsheet, hrOnly: true },
+          { id: "history", label: "10. Payroll History", icon: History, adminOnly: true }
         ].map(tab => {
+          if (tab.hrOnly && currentUser?.role !== "Administrator" && currentUser?.role !== "HR Officer") return null;
+          if (tab.adminOnly && currentUser?.role !== "Administrator" && currentUser?.role !== "Auditor") return null;
           const IconComp = tab.icon;
           const isActive = activeSubTab === tab.id;
           return (
@@ -1486,6 +1506,17 @@ export default function PayrollManagement({
                               >
                                 <ShieldAlert className="h-3.5 w-3.5" />
                               </button>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Are you sure you want to delete salary component ${c.name} (${c.code})?`)) {
+                                    onDeleteComponent && onDeleteComponent(c.id);
+                                  }
+                                }}
+                                className="p-1 text-slate-400 hover:text-rose-700 hover:bg-rose-50 rounded"
+                                title="Delete Component"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
                             </>
                           ) : (
                             <span className="text-[10px] text-slate-400 italic">Read-Only</span>
@@ -1647,13 +1678,26 @@ export default function PayrollManagement({
                         <td className="p-3 text-slate-500 font-medium">{p.createdBy}</td>
                         <td className="p-3 text-right">
                           {!isAuditor && (
-                            <button
-                              onClick={() => handleTogglePeriodLock(p)}
-                              className="p-1 px-2 text-[10px] font-bold border rounded bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-1 justify-end ml-auto"
-                            >
-                              {p.status === "Locked" ? <Unlock className="h-3 w-3 text-emerald-600" /> : <Lock className="h-3 w-3 text-rose-600" />}
-                              <span>{p.status === "Locked" ? "Unlock Period" : "Lock Period"}</span>
-                            </button>
+                            <div className="flex items-center gap-1 justify-end ml-auto">
+                              <button
+                                onClick={() => handleTogglePeriodLock(p)}
+                                className="p-1 px-2 text-[10px] font-bold border rounded bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-1"
+                              >
+                                {p.status === "Locked" ? <Unlock className="h-3 w-3 text-emerald-600" /> : <Lock className="h-3 w-3 text-rose-600" />}
+                                <span>{p.status === "Locked" ? "Unlock" : "Lock"}</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Are you sure you want to permanently delete payroll period ${p.periodName}?`)) {
+                                    onDeletePeriod && onDeletePeriod(p.id);
+                                  }
+                                }}
+                                className="p-1 text-slate-400 hover:text-rose-700 hover:bg-rose-50 rounded"
+                                title="Delete Period"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -1873,14 +1917,27 @@ export default function PayrollManagement({
                         <td className="px-4 py-3 text-right text-slate-600">{(r.loanDeduction + r.otherDeductions).toLocaleString()} ETB</td>
                         <td className="px-4 py-3 text-right font-black text-emerald-700 bg-emerald-50/50">{r.netSalary.toLocaleString()} ETB</td>
                         <td className="px-4 py-3 text-right text-indigo-700 font-bold">{r.employerPension.toLocaleString()} ETB</td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-4 py-3 text-center space-x-1 whitespace-nowrap">
                           <button
                             onClick={() => setBreakdownRecord(r)}
-                            className="p-1 px-2 text-[10px] font-bold border rounded bg-slate-50 hover:bg-slate-100 text-sky-700"
+                            className="p-1 px-2 text-[10px] font-bold border rounded bg-slate-50 hover:bg-slate-100 text-sky-700 inline-block"
                             title="View Calculation Breakdown"
                           >
                             Breakdown
                           </button>
+                          {!isAuditor && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Are you sure you want to delete this payroll record for ${r.employeeName}?`)) {
+                                  onDeleteRecord && onDeleteRecord(r.id);
+                                }
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-700 hover:bg-rose-50 rounded inline-block"
+                              title="Delete Record"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -2005,7 +2062,16 @@ export default function PayrollManagement({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {payslips.filter(ps => ps.payrollPeriodId === selectedPeriod.id).length === 0 ? (
+                  {payslips.filter(ps => {
+                    if (ps.payrollPeriodId !== selectedPeriod.id) return false;
+                    if (currentUser?.role === "Employee") {
+                      const myEmp = employees.find(e => e.email.toLowerCase() === currentUser.email.toLowerCase());
+                      const isMyRecord = (myEmp && ps.employeeId === myEmp.employeeId) || 
+                                         (currentUser.employeeId && ps.employeeId === currentUser.employeeId);
+                      if (!isMyRecord) return false;
+                    }
+                    return true;
+                  }).length === 0 ? (
                     <tr>
                       <td colSpan={7} className="p-12 text-center text-slate-400">
                         <FileText className="h-8 w-8 mx-auto text-slate-300 mb-2" />
@@ -2014,7 +2080,16 @@ export default function PayrollManagement({
                       </td>
                     </tr>
                   ) : (
-                    payslips.filter(ps => ps.payrollPeriodId === selectedPeriod.id).map(ps => (
+                    payslips.filter(ps => {
+                      if (ps.payrollPeriodId !== selectedPeriod.id) return false;
+                      if (currentUser?.role === "Employee") {
+                        const myEmp = employees.find(e => e.email.toLowerCase() === currentUser.email.toLowerCase());
+                        const isMyRecord = (myEmp && ps.employeeId === myEmp.employeeId) || 
+                                           (currentUser.employeeId && ps.employeeId === currentUser.employeeId);
+                        if (!isMyRecord) return false;
+                      }
+                      return true;
+                    }).map(ps => (
                       <tr key={ps.id} className="hover:bg-slate-50/50">
                         <td className="p-3 font-mono font-bold text-primary-custom">{ps.payslipRefNo}</td>
                         <td className="p-3">
@@ -2033,13 +2108,28 @@ export default function PayrollManagement({
                             View / Print
                           </button>
                           {!isAuditor && (
-                            <button
-                              onClick={() => handleSendSinglePayslipEmail(ps)}
-                              className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-slate-100 rounded inline-block"
-                              title="Email Payslip"
-                            >
-                              <Mail className="h-3.5 w-3.5" />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleSendSinglePayslipEmail(ps)}
+                                className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-slate-100 rounded inline-block"
+                                title="Email Payslip"
+                              >
+                                <Mail className="h-3.5 w-3.5" />
+                              </button>
+                              {isAdmin && (
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Are you sure you want to delete payslip ${ps.payslipRefNo}?`)) {
+                                      onDeletePayslip && onDeletePayslip(ps.id);
+                                    }
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-rose-700 hover:bg-rose-50 rounded inline-block"
+                                  title="Delete Payslip"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </>
                           )}
                         </td>
                       </tr>

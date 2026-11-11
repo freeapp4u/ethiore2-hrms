@@ -15,12 +15,13 @@ import { getFirestore, doc, getDocFromServer } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyD-7uRzGJE8rwyOAaLejnJM5re6dMEQBWo",
-  authDomain: "etrhrms.firebaseapp.com",
-  projectId: "etrhrms",
-  storageBucket: "etrhrms.firebasestorage.app",
-  messagingSenderId: "615200677661",
-  appId: "1:615200677661:web:866ec1f6b5034262b04bf4"
+  apiKey: "AIzaSyBgBTiDZzDM8y88KOBU8tsRo3vGlk_SCIk",
+  authDomain: "ethiopian-re-hrms.firebaseapp.com",
+  databaseURL: "https://ethiopian-re-hrms-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ethiopian-re-hrms",
+  storageBucket: "ethiopian-re-hrms.firebasestorage.app",
+  messagingSenderId: "890391236442",
+  appId: "1:890391236442:web:2e8258bc8550f5e23cad63"
 };
 
 // Initialize Firebase

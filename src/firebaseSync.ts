@@ -19,6 +19,12 @@ export async function syncRecordToFirestore(collectionName: string, id: string, 
     const docRef = doc(db, collectionName, cleanId);
     // Sanitize optional properties or undefined to be null for firestore compatibility
     const sanitizedData = JSON.parse(JSON.stringify(data, (_, v) => v === undefined ? null : v));
+    if (auth.currentUser?.uid && !sanitizedData.ownerUid) {
+      sanitizedData.ownerUid = auth.currentUser.uid;
+    }
+    if (auth.currentUser?.email && !sanitizedData.employeeEmail) {
+      sanitizedData.employeeEmail = auth.currentUser.email.trim().toLowerCase();
+    }
     await setDoc(docRef, sanitizedData);
     console.log(`Cloud Sync Success [${collectionName}/${cleanId}]`);
   } catch (error) {
@@ -58,6 +64,12 @@ export async function syncBatchRecordsToFirestore(
         const cleanId = rec.id.replace(/[^a-zA-Z0-9_\-]/g, "_");
         const docRef = doc(db, collectionName, cleanId);
         const sanitizedData = JSON.parse(JSON.stringify(rec.data, (_, v) => v === undefined ? null : v));
+        if (auth.currentUser?.uid && !sanitizedData.ownerUid) {
+          sanitizedData.ownerUid = auth.currentUser.uid;
+        }
+        if (auth.currentUser?.email && !sanitizedData.employeeEmail) {
+          sanitizedData.employeeEmail = auth.currentUser.email.trim().toLowerCase();
+        }
         batch.set(docRef, sanitizedData);
       });
       await batch.commit();

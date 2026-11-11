@@ -21,6 +21,7 @@ interface LeaveManagementProps {
   initialSubTab?: string;
   onAddLeave: (record: LeaveRecord) => boolean;
   onUpdateLeave: (record: LeaveRecord) => void;
+  onDeleteLeave?: (id: string) => boolean;
   onUpdateConfig: (config: CompanyConfig) => void;
   onLogAction: (module: string, action: string, record: string, details: string) => void;
 }
@@ -35,6 +36,7 @@ export default function LeaveManagement({
   initialSubTab = "dashboard",
   onAddLeave,
   onUpdateLeave,
+  onDeleteLeave,
   onUpdateConfig,
   onLogAction
 }: LeaveManagementProps) {
@@ -117,7 +119,15 @@ export default function LeaveManagement({
   // Compute Employee Balances
   const computedBalances: EmployeeLeaveBalance[] = useMemo(() => {
     const results: EmployeeLeaveBalance[] = [];
-    const activeEmps = employees.filter(e => e.status === "Active");
+    const activeEmps = employees.filter(e => {
+      if (e.status !== "Active") return false;
+      if (currentUser?.role === "Employee") {
+        return (
+          e.employeeId === currentUser.employeeId
+        );
+      }
+      return true;
+    });
     const currentYear = leaveYearConfig.yearName || "2026";
 
     activeEmps.forEach(emp => {
@@ -864,7 +874,9 @@ export default function LeaveManagement({
                 <p className="text-xl font-extrabold text-slate-800 mt-1">
                   {leaves.filter(l => {
                     const today = new Date().toISOString().split("T")[0];
-                    return l.status === "Active" && l.startDate <= today && l.endDate >= today;
+                    const isEmployee = currentUser?.role === "Employee";
+                    const isMyRecord = !isEmployee || l.employeeId === currentUser?.employeeId;
+                    return l.status === "Active" && l.startDate <= today && l.endDate >= today && isMyRecord;
                   }).length} Personnel
                 </p>
               </div>
@@ -877,7 +889,11 @@ export default function LeaveManagement({
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Days Utilized YTD</p>
                 <p className="text-xl font-extrabold text-slate-800 mt-1">
-                  {leaves.filter(l => l.status !== "Cancelled").reduce((s, l) => s + l.daysCount, 0)} Days
+                  {leaves.filter(l => {
+                    const isEmployee = currentUser?.role === "Employee";
+                    const isMyRecord = !isEmployee || l.employeeId === currentUser?.employeeId;
+                    return l.status !== "Cancelled" && isMyRecord;
+                  }).reduce((s, l) => s + l.daysCount, 0)} Days
                 </p>
               </div>
               <div className="p-3 bg-sky-50 text-sky-600 rounded-xl">
@@ -936,14 +952,22 @@ export default function LeaveManagement({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {leaves.filter(l => l.status === "Active").length === 0 ? (
+                    {leaves.filter(l => {
+                      const isEmployee = currentUser?.role === "Employee";
+                      const isMyRecord = !isEmployee || l.employeeId === currentUser?.employeeId;
+                      return l.status === "Active" && isMyRecord;
+                    }).length === 0 ? (
                       <tr>
                         <td colSpan={5} className="p-8 text-center text-slate-400 font-medium">
                           No active leave applications on schedule today.
                         </td>
                       </tr>
                     ) : (
-                      leaves.filter(l => l.status === "Active").slice(0, 5).map(l => {
+                      leaves.filter(l => {
+                        const isEmployee = currentUser?.role === "Employee";
+                        const isMyRecord = !isEmployee || l.employeeId === currentUser?.employeeId;
+                        return l.status === "Active" && isMyRecord;
+                      }).slice(0, 5).map(l => {
                         const emp = employees.find(e => e.employeeId === l.employeeId);
                         const dept = emp ? departments.find(d => d.id === emp.departmentId) : null;
                         return (
@@ -972,8 +996,12 @@ export default function LeaveManagement({
               </h3>
               <div className="space-y-3">
                 {activeLeaveTypes.map(lt => {
-                  const used = leaves.filter(l => l.leaveType === lt.name && l.status !== "Cancelled").reduce((s, l) => s + l.daysCount, 0);
-                  const total = lt.annualEntitlement * Math.max(1, activeEmployees.length);
+                  const isEmployee = currentUser?.role === "Employee";
+                  const used = leaves.filter(l => {
+                    const isMyRecord = !isEmployee || l.employeeId === currentUser?.employeeId;
+                    return l.leaveType === lt.name && l.status !== "Cancelled" && isMyRecord;
+                  }).reduce((s, l) => s + l.daysCount, 0);
+                  const total = lt.annualEntitlement * (isEmployee ? 1 : Math.max(1, activeEmployees.length));
                   const pct = Math.min(100, Math.round((used / (total || 1)) * 100));
                   return (
                     <div key={lt.id} className="space-y-1">
@@ -1044,7 +1072,7 @@ export default function LeaveManagement({
               {currentUser?.role !== "Auditor" && (
                 <button
                   onClick={handleOpenAdd}
-                  className="px-3 py-1.5 bg-primary-custom text-white text-xs font-bold rounded-lg hover:opacity-95 flex items-center gap-1 transition-all"
+                  className="px-3.5 py-1.5 bg-primary-custom text-white text-xs font-bold rounded-lg hover:opacity-95 flex items-center gap-1 shadow-2xs transition-all"
                 >
                   <Plus className="h-3.5 w-3.5 text-accent-custom" /> Book Leave
                 </button>
@@ -1052,7 +1080,6 @@ export default function LeaveManagement({
             </div>
           </div>
 
-          {/* High Density Table */}
           <div className="bg-white border rounded-xl overflow-hidden shadow-2xs">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
@@ -1070,6 +1097,10 @@ export default function LeaveManagement({
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {leaves.filter(l => {
+                    const isEmployee = currentUser?.role === "Employee";
+                    const isMyRecord = !isEmployee || l.employeeId === currentUser?.employeeId;
+                    if (!isMyRecord) return false;
+
                     const emp = employees.find(e => e.employeeId === l.employeeId);
                     const matchSearch = (emp?.fullName || l.employeeId).toLowerCase().includes(appSearchTerm.toLowerCase());
                     const matchType = appFilterType ? l.leaveType === appFilterType : true;
@@ -1078,11 +1109,15 @@ export default function LeaveManagement({
                   }).length === 0 ? (
                     <tr>
                       <td colSpan={8} className="p-8 text-center text-slate-400 font-medium">
-                        No leave records match the specified filters.
+                        No leave applications match the current criteria.
                       </td>
                     </tr>
                   ) : (
                     leaves.filter(l => {
+                      const isEmployee = currentUser?.role === "Employee";
+                      const isMyRecord = !isEmployee || l.employeeId === currentUser?.employeeId;
+                      if (!isMyRecord) return false;
+
                       const emp = employees.find(e => e.employeeId === l.employeeId);
                       const matchSearch = (emp?.fullName || l.employeeId).toLowerCase().includes(appSearchTerm.toLowerCase());
                       const matchType = appFilterType ? l.leaveType === appFilterType : true;
@@ -1139,6 +1174,17 @@ export default function LeaveManagement({
                                     <Ban className="h-3.5 w-3.5" />
                                   </button>
                                 )}
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Are you sure you want to delete this leave application for employee ${l.employeeId}?`)) {
+                                      onDeleteLeave && onDeleteLeave(l.id);
+                                    }
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-rose-700 hover:bg-rose-50 rounded"
+                                  title="Delete Record"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
                               </>
                             ) : (
                               <span className="text-[10px] text-slate-400 italic">Read-Only</span>

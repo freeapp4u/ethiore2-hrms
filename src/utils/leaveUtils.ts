@@ -158,7 +158,7 @@ export function calculateEmployeeLeaveBalance(
   }
 
   return {
-    id: `BAL_${employeeId}_${leaveTypeConfig.code}_${leaveYear}`,
+    id: `BAL_${employeeId}_${leaveTypeConfig.id}_${leaveYear}`,
     employeeId,
     leaveTypeId: leaveTypeConfig.id,
     leaveTypeName: leaveTypeConfig.name,

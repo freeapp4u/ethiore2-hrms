@@ -232,15 +232,79 @@ export const DEFAULT_COMPANY_CONFIG: CompanyConfig = {
   },
   emailSettings: {
     enableEmployeeEmails: true,
-    smtpHost: "mail.ethiopianre.com",
+    provider: "Microsoft 365 Exchange Online",
+    mailboxType: "Shared Mailbox",
+    smtpHost: "smtp.office365.com",
     smtpPort: 587,
-    smtpUser: "notifications@ethiopianre.com",
-    smtpSenderEmail: "noreply@ethiopianre.com",
+    encryption: "STARTTLS (TLS 1.2+)",
+    authMechanism: "OAuth 2.0 (XOAUTH2)",
+    authFlow: "Microsoft Entra ID Client Credentials Flow",
+    smtpSenderEmail: "tilahun_hr_officer@ethiopianre.com",
     smtpSenderName: "Ethiopian Reinsurance HRMS",
     useTlsSsl: true,
+    m365ConnectionStatus: "Pending Entra ID Administrator Setup",
+    notificationToggles: {
+      authAlerts: true,
+      employeeEvents: true,
+      leaveWorkflow: true,
+      payrollPayslips: true,
+      securityAlerts: true
+    },
     updatedBy: "contactesfaye@gmail.com",
     updatedDate: "2026-01-01"
-  }
+  },
+  emailTemplates: [
+    {
+      id: "TPL_001",
+      name: "Account Verification & Welcome",
+      code: "account_verification",
+      category: "Authentication",
+      subject: "Account Verification & Access Credentials",
+      description: "Dispatched upon operator account creation to verify email address.",
+      bodyHtml: `Dear {{employee_name}},\n\nWelcome to Ethiopian Reinsurance S.C. HRMS Platform. Please verify your official email address by clicking the button below.\n\nDetails: {{details}}`,
+      updatedAt: "2026-01-01"
+    },
+    {
+      id: "TPL_002",
+      name: "Employee Onboarding Notice",
+      code: "employee_onboarding",
+      category: "Employee Management",
+      subject: "Official HR Onboarding & Profile Created",
+      description: "Sent to newly registered employees upon HR Master profile enrollment.",
+      bodyHtml: `Dear {{employee_name}},\n\nYour personnel master profile has been successfully registered at Ethiopian Reinsurance S.C.\n\nPosition Details: {{details}}`,
+      updatedAt: "2026-01-01"
+    },
+    {
+      id: "TPL_003",
+      name: "Leave Request & Status Notification",
+      code: "leave_notification",
+      category: "Leave Management",
+      subject: "Leave Application Status Update",
+      description: "Dispatched to employee and department head upon leave submission, approval, or rejection.",
+      bodyHtml: `Dear {{employee_name}},\n\nYour leave application status has been updated.\n\nLeave Details: {{details}}`,
+      updatedAt: "2026-01-01"
+    },
+    {
+      id: "TPL_004",
+      name: "Payslip Distribution Statement",
+      code: "payslip_available",
+      category: "Payroll",
+      subject: "Official Payslip Statement Available",
+      description: "Dispatched upon monthly payroll approval to notify employees of available payslip.",
+      bodyHtml: `Dear {{employee_name}},\n\nYour monthly salary statement and payslip for Ethiopian Reinsurance S.C. is now available.\n\nPayroll Details: {{details}}`,
+      updatedAt: "2026-01-01"
+    },
+    {
+      id: "TPL_005",
+      name: "System Security & Administrative Alert",
+      code: "security_alert",
+      category: "Administration",
+      subject: "ETRHRMS System Security Alert",
+      description: "Sent to system administrators upon security events or critical system configuration updates.",
+      bodyHtml: `Dear Administrator,\n\nA security event or administrative alert was logged in ETRHRMS.\n\nAlert Details: {{details}}`,
+      updatedAt: "2026-01-01"
+    }
+  ]
 };
 
 export const DEFAULT_FAMILY_MEMBERS: FamilyMember[] = [];
